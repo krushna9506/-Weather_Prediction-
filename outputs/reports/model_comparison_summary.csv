@@ -1,0 +1,6 @@
+Model,Accuracy,Precision (Macro),Recall (Macro),F1-Score (Macro),ROC-AUC (Macro),Probabilistic MSE,Train Time (s),Latency (ms/sample)
+Random Forest,1.0,1.0,1.0,1.0,1.0,0.0003,0.581,0.0058
+Gradient Boosting (Hist),1.0,1.0,1.0,1.0,1.0,0.0,0.994,0.0035
+Decision Tree,1.0,1.0,1.0,1.0,1.0,0.0,0.154,0.0002
+Logistic Regression,0.9996,0.9996,0.9996,0.9996,1.0,0.0002,0.198,0.0002
+Support Vector Machine (RBF),0.9987,0.9987,0.9987,0.9987,1.0,0.0004,0.833,0.059

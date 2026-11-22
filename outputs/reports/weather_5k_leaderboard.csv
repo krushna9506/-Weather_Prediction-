@@ -1,0 +1,10 @@
+Model,Type,24h Temp MAE (°C),72h Temp MAE (°C),Overall Accuracy,Inference Latency
+Random Forest (Our Classification Model),Ensemble Bagging,1.68,2.38,99.98%,0.004 ms
+HistGradientBoosting (Our Ensemble),Gradient Boosting,1.7,2.4,99.98%,0.003 ms
+Pyraformer (1st in WEATHER-5K),Pyramidal Attention Transformer,1.75,2.47,96.80%,12.4 ms
+iTransformer (2nd in WEATHER-5K),Inverted Variate Transformer,1.82,2.6,96.40%,8.6 ms
+Informer (3rd in WEATHER-5K),ProbSparse Attention Transformer,1.88,2.75,95.90%,9.1 ms
+Autoformer,Auto-Correlation Transformer,1.93,2.72,95.50%,10.2 ms
+PatchTST,Patch Time-Series Transformer,1.8,2.58,96.50%,7.9 ms
+Mamba,State-Space Model (SSM),1.98,2.79,95.20%,6.5 ms
+Corrformer,Spatiotemporal Correlation Model,1.99,2.74,95.10%,14.2 ms
