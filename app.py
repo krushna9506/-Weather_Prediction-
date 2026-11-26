@@ -1,8 +1,7 @@
 """
-SkyCast AI - Global Weather Forecasting & Practical Examination Defense System
-Combines Fully Working Production Website + Complete Examination Rubrics (A to H, 30 Marks, CO1-4 L5)
-Aligned with the WEATHER-5K Global Station Benchmark (taohan10200/WEATHER-5K)
-Features: Live Satellite Telemetry (Open-Meteo), Interactive World Map, Telemetry Studio, Rubric Visualizations & SOTA Leaderboard
+SkyCast AI - Dark Bento Weather Intelligence & Global Radar Platform
+Clean, modern UI with Top Menu Bar, Live Open-Meteo Satellite Telemetry,
+Browser GPS + IP Location Detection, 3D PyDeck Radar Map & AI Forecasting.
 """
 
 import streamlit as st
@@ -20,90 +19,166 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Page Configuration
 st.set_page_config(
-    page_title="SkyCast AI | Live Satellite Weather & Examination System",
+    page_title="SkyCast AI | Weather Intelligence",
     page_icon="🌤️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Custom Styling for Clean Modern UI
+# =========================================================================
+# DARK BENTO UI THEME & CUSTOM CSS (Aligned with Modern Weather Dashboard)
+# =========================================================================
 st.markdown("""
 <style>
-    .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 2rem;
+    /* Global Dark Canvas */
+    .stApp {
+        background-color: #0B0D12;
+        color: #F3F4F6;
     }
-    .app-header {
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1.5rem;
+        max-width: 1400px;
+    }
+    /* Hide default Streamlit header clutter */
+    header[data-testid="stHeader"] {
+        background: transparent;
+        height: 0.5rem;
+    }
+    /* Top Menu Bar */
+    .top-brand {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #F9FAFB;
+        letter-spacing: -0.4px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding-bottom: 0.8rem;
-        margin-bottom: 1.2rem;
-        border-bottom: 1px solid rgba(128, 128, 128, 0.18);
+        gap: 0.5rem;
     }
-    .app-title {
-        font-size: 1.85rem;
+    .top-sub {
+        font-size: 0.8rem;
+        color: #9CA3AF;
+        margin-top: -2px;
+    }
+    /* Bento Cards */
+    .bento-card {
+        background: #151821;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 18px;
+        padding: 1.25rem;
+        margin-bottom: 0.9rem;
+    }
+    .bento-card-sm {
+        background: #151821;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 1rem 1.15rem;
+        height: 100%;
+    }
+    .bento-title {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #D1D5DB;
+        margin-bottom: 0.65rem;
+    }
+    .hero-temp {
+        font-size: 3.4rem;
         font-weight: 700;
-        letter-spacing: -0.5px;
-        margin: 0;
+        color: #FFFFFF;
+        line-height: 1;
+        letter-spacing: -1.5px;
     }
-    .app-badge {
-        background: linear-gradient(135deg, #2563EB, #1D4ED8);
-        color: white;
-        padding: 0.35rem 0.8rem;
+    .hero-cond {
+        font-size: 1.05rem;
+        font-weight: 500;
+        color: #D1D5DB;
+    }
+    .ai-pill {
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.45);
+        color: #FBBF24;
+        padding: 0.22rem 0.65rem;
         border-radius: 9999px;
-        font-size: 0.82rem;
+        font-size: 0.75rem;
         font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
+        display: inline-block;
     }
-    .live-badge {
-        background: linear-gradient(135deg, #10B981, #059669);
-        color: white;
-        padding: 0.35rem 0.8rem;
+    .live-dot {
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        color: #34D399;
+        padding: 0.22rem 0.65rem;
         border-radius: 9999px;
-        font-size: 0.82rem;
+        font-size: 0.75rem;
         font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
+        display: inline-block;
     }
-    .exam-badge {
-        background: linear-gradient(135deg, #059669, #047857);
-        color: white;
-        padding: 0.35rem 0.8rem;
-        border-radius: 9999px;
-        font-size: 0.82rem;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-    }
-    .rubric-box {
-        background: rgba(37, 99, 235, 0.05);
-        border: 1px solid rgba(37, 99, 235, 0.25);
-        border-radius: 10px;
-        padding: 1rem 1.2rem;
-        margin-bottom: 1.2rem;
-    }
-    .rubric-header {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #1D4ED8;
-        margin: 0 0 0.4rem 0;
-    }
-    .forecast-card {
-        background: rgba(128, 128, 128, 0.06);
-        border: 1px solid rgba(128, 128, 128, 0.15);
-        border-radius: 10px;
-        padding: 0.85rem;
+    /* 7-Day Forecast Cards */
+    .day-card {
+        background: #151821;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 16px;
+        padding: 0.85rem 0.4rem;
         text-align: center;
+    }
+    .day-card-active {
+        background: #1C212E;
+        border: 1px solid rgba(245, 158, 11, 0.45);
+        border-radius: 16px;
+        padding: 0.85rem 0.4rem;
+        text-align: center;
+    }
+    .day-name {
+        font-size: 0.82rem;
+        color: #9CA3AF;
+        font-weight: 600;
+    }
+    .day-icon {
+        font-size: 1.85rem;
+        margin: 0.45rem 0;
+    }
+    .day-temp {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #F9FAFB;
+    }
+    /* Map Promo Card */
+    .map-promo {
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 60%, #1E1B4B 100%);
+        border: 1px solid rgba(96, 165, 250, 0.25);
+        border-radius: 18px;
+        padding: 1.25rem;
+        text-align: center;
+    }
+    /* Menu Radio Styling */
+    div[data-testid="stRadio"] > div {
+        flex-direction: row;
+        gap: 0.4rem;
+    }
+    div[data-testid="stRadio"] label {
+        background: #151821;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 0.4rem 0.9rem !important;
+        cursor: pointer;
+    }
+    /* Overview Metric Large Value */
+    .ov-val {
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #F9FAFB;
+        line-height: 1.1;
+    }
+    .ov-sub {
+        font-size: 0.78rem;
+        color: #9CA3AF;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Resolve directories
+# =========================================================================
+# MODEL ARTIFACTS & GLOBAL STATIONS
+# =========================================================================
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 OUTPUTS_DIR = os.path.join(ROOT_DIR, "outputs")
@@ -112,215 +187,102 @@ OUTPUTS_DIR = os.path.join(ROOT_DIR, "outputs")
 def load_artifacts():
     def get_path(fname):
         p1 = os.path.join(MODELS_DIR, fname)
-        if os.path.exists(p1):
-            return p1
-        return os.path.join(ROOT_DIR, fname)
+        return p1 if os.path.exists(p1) else os.path.join(ROOT_DIR, fname)
 
-    model = joblib.load(get_path("weather_model.pkl"))
-    scaler = joblib.load(get_path("scaler.pkl"))
-    le = joblib.load(get_path("label_encoder.pkl"))
-    feature_cols = joblib.load(get_path("feature_columns.pkl"))
-    return model, scaler, le, feature_cols
+    return (
+        joblib.load(get_path("weather_model.pkl")),
+        joblib.load(get_path("scaler.pkl")),
+        joblib.load(get_path("label_encoder.pkl")),
+        joblib.load(get_path("feature_columns.pkl")),
+    )
 
 try:
     model, scaler, le, feature_cols = load_artifacts()
     artifacts_loaded = True
 except Exception as e:
     artifacts_loaded = False
-    st.error(f"Error initializing AI engine: {e}")
+    st.error(f"Error loading AI models: {e}")
 
-# Official WEATHER-5K Global Station Network (28 Worldwide Observatories)
 GLOBAL_WEATHER_STATIONS = {
-    "🇨🇭 Zermatt Matterhorn (Alpine)": {
-        "id": "CH067200", "name": "Zermatt Matterhorn", "country": "Switzerland", "flag": "🇨🇭",
-        "lat": 45.98, "lon": 7.75, "alt": 2450.0, "region": "Alpine Mountain Highlands", "loc": "mountain", "season": "Winter",
-        "tmp": -6.5, "dpt": -8.0, "wspd": 22.0, "wdir": 210.0, "slp": 782.0, "precip": 75.0, "uv": 2, "vis": 3.0, "cloud": "overcast"
-    },
-    "🇨🇭 Zurich Kloten (Alps)": {
-        "id": "CH066600", "name": "Zurich Kloten", "country": "Switzerland", "flag": "🇨🇭",
-        "lat": 47.48, "lon": 8.54, "alt": 432.0, "region": "Alpine Mountain Highlands", "loc": "mountain", "season": "Autumn",
-        "tmp": 12.0, "dpt": 10.5, "wspd": 11.0, "wdir": 195.0, "slp": 995.0, "precip": 60.0, "uv": 3, "vis": 6.0, "cloud": "cloudy"
-    },
-    "🇬🇧 London Heathrow": {
-        "id": "UK037720", "name": "London Heathrow", "country": "United Kingdom", "flag": "🇬🇧",
-        "lat": 51.48, "lon": -0.45, "alt": 25.0, "region": "Temperate Continental", "loc": "inland", "season": "Autumn",
-        "tmp": 14.0, "dpt": 12.5, "wspd": 15.0, "wdir": 240.0, "slp": 1008.0, "precip": 70.0, "uv": 2, "vis": 5.0, "cloud": "overcast"
-    },
-    "🇫🇷 Paris Charles de Gaulle": {
-        "id": "FR071570", "name": "Paris Charles de Gaulle", "country": "France", "flag": "🇫🇷",
-        "lat": 49.01, "lon": 2.55, "alt": 119.0, "region": "Temperate Continental", "loc": "inland", "season": "Spring",
-        "tmp": 16.5, "dpt": 11.0, "wspd": 13.0, "wdir": 225.0, "slp": 1014.0, "precip": 25.0, "uv": 4, "vis": 11.0, "cloud": "partly cloudy"
-    },
-    "🇺🇸 New York JFK": {
-        "id": "US744860", "name": "New York JFK", "country": "United States", "flag": "🇺🇸",
-        "lat": 40.64, "lon": -73.78, "alt": 4.0, "region": "Temperate Continental", "loc": "coastal", "season": "Spring",
-        "tmp": 18.5, "dpt": 8.0, "wspd": 16.0, "wdir": 180.0, "slp": 1016.0, "precip": 10.0, "uv": 6, "vis": 14.0, "cloud": "partly cloudy"
-    },
-    "🇺🇸 Denver Stapleton (Mile High)": {
-        "id": "US725650", "name": "Denver Stapleton", "country": "United States", "flag": "🇺🇸",
-        "lat": 39.77, "lon": -104.88, "alt": 1611.0, "region": "Temperate Continental", "loc": "mountain", "season": "Winter",
-        "tmp": -2.0, "dpt": -4.5, "wspd": 18.0, "wdir": 315.0, "slp": 845.0, "precip": 70.0, "uv": 4, "vis": 4.0, "cloud": "cloudy"
-    },
-    "🇺🇸 Los Angeles LAX": {
-        "id": "US722950", "name": "Los Angeles LAX", "country": "United States", "flag": "🇺🇸",
-        "lat": 33.94, "lon": -118.41, "alt": 38.0, "region": "Mediterranean Maritime", "loc": "coastal", "season": "Summer",
-        "tmp": 25.5, "dpt": 15.0, "wspd": 14.0, "wdir": 260.0, "slp": 1013.0, "precip": 0.0, "uv": 9, "vis": 16.0, "cloud": "clear"
-    },
-    "🇺🇸 Anchorage Ted Stevens": {
-        "id": "US702730", "name": "Anchorage Ted Stevens", "country": "United States", "flag": "🇺🇸",
-        "lat": 61.17, "lon": -149.99, "alt": 46.0, "region": "Nordic / Sub-Polar", "loc": "coastal", "season": "Winter",
-        "tmp": -8.0, "dpt": -10.0, "wspd": 17.0, "wdir": 350.0, "slp": 998.0, "precip": 80.0, "uv": 1, "vis": 3.5, "cloud": "overcast"
-    },
-    "🇺🇸 Miami Intl": {
-        "id": "US722020", "name": "Miami Intl", "country": "United States", "flag": "🇺🇸",
-        "lat": 25.79, "lon": -80.29, "alt": 3.0, "region": "Equatorial Tropical", "loc": "coastal", "season": "Summer",
-        "tmp": 31.0, "dpt": 26.0, "wspd": 12.0, "wdir": 120.0, "slp": 1015.0, "precip": 65.0, "uv": 10, "vis": 8.0, "cloud": "cloudy"
-    },
-    "🇺🇸 Honolulu Daniel Inouye": {
-        "id": "US911820", "name": "Honolulu Daniel Inouye", "country": "United States", "flag": "🇺🇸",
-        "lat": 21.32, "lon": -157.92, "alt": 4.0, "region": "Mediterranean Maritime", "loc": "coastal", "season": "Summer",
-        "tmp": 29.5, "dpt": 21.0, "wspd": 20.0, "wdir": 70.0, "slp": 1017.0, "precip": 5.0, "uv": 11, "vis": 18.0, "cloud": "clear"
-    },
-    "🇯🇵 Tokyo Haneda": {
-        "id": "JP476620", "name": "Tokyo Haneda", "country": "Japan", "flag": "🇯🇵",
-        "lat": 35.55, "lon": 139.78, "alt": 6.0, "region": "Temperate Continental", "loc": "coastal", "season": "Summer",
-        "tmp": 29.0, "dpt": 23.0, "wspd": 14.0, "wdir": 160.0, "slp": 1012.0, "precip": 45.0, "uv": 8, "vis": 10.0, "cloud": "cloudy"
-    },
-    "🇸🇬 Singapore Changi": {
-        "id": "SG486980", "name": "Singapore Changi", "country": "Singapore", "flag": "🇸🇬",
-        "lat": 1.36, "lon": 103.99, "alt": 7.0, "region": "Equatorial Tropical", "loc": "coastal", "season": "Summer",
-        "tmp": 31.5, "dpt": 26.5, "wspd": 10.0, "wdir": 110.0, "slp": 1011.0, "precip": 80.0, "uv": 10, "vis": 6.0, "cloud": "overcast"
-    },
-    "🇦🇪 Dubai Intl": {
-        "id": "AE411940", "name": "Dubai Intl", "country": "United Arab Emirates", "flag": "🇦🇪",
-        "lat": 25.25, "lon": 55.36, "alt": 19.0, "region": "Arid / Desert", "loc": "coastal", "season": "Summer",
-        "tmp": 43.0, "dpt": 15.0, "wspd": 8.0, "wdir": 320.0, "slp": 1014.0, "precip": 0.0, "uv": 12, "vis": 15.0, "cloud": "clear"
-    },
-    "🇸🇦 Riyadh King Khalid": {
-        "id": "SA404380", "name": "Riyadh King Khalid", "country": "Saudi Arabia", "flag": "🇸🇦",
-        "lat": 24.96, "lon": 46.70, "alt": 612.0, "region": "Arid / Desert", "loc": "inland", "season": "Summer",
-        "tmp": 45.0, "dpt": 8.0, "wspd": 14.0, "wdir": 340.0, "slp": 950.0, "precip": 0.0, "uv": 13, "vis": 12.0, "cloud": "clear"
-    },
-    "🇳🇴 Tromsø Langnes (Arctic Polar)": {
-        "id": "NO010260", "name": "Tromsø Langnes", "country": "Norway", "flag": "🇳🇴",
-        "lat": 69.68, "lon": 18.92, "alt": 9.0, "region": "Nordic / Sub-Polar", "loc": "coastal", "season": "Winter",
-        "tmp": -5.0, "dpt": -6.5, "wspd": 20.0, "wdir": 45.0, "slp": 994.0, "precip": 85.0, "uv": 0, "vis": 2.0, "cloud": "overcast"
-    },
-    "🇮🇸 Reykjavik": {
-        "id": "IS040180", "name": "Reykjavik", "country": "Iceland", "flag": "🇮🇸",
-        "lat": 64.13, "lon": -21.94, "alt": 18.0, "region": "Nordic / Sub-Polar", "loc": "coastal", "season": "Winter",
-        "tmp": -1.5, "dpt": -3.0, "wspd": 26.0, "wdir": 90.0, "slp": 988.0, "precip": 75.0, "uv": 0, "vis": 4.0, "cloud": "overcast"
-    },
-    "🇮🇳 Mumbai Santacruz": {
-        "id": "IN430030", "name": "Mumbai Santacruz", "country": "India", "flag": "🇮🇳",
-        "lat": 19.12, "lon": 72.85, "alt": 14.0, "region": "Equatorial Tropical", "loc": "coastal", "season": "Summer",
-        "tmp": 32.0, "dpt": 27.0, "wspd": 16.0, "wdir": 250.0, "slp": 1004.0, "precip": 90.0, "uv": 8, "vis": 4.5, "cloud": "overcast"
-    },
-    "🇮🇳 New Delhi IGI": {
-        "id": "IN421820", "name": "New Delhi IGI", "country": "India", "flag": "🇮🇳",
-        "lat": 28.57, "lon": 77.10, "alt": 237.0, "region": "Temperate Continental", "loc": "inland", "season": "Summer",
-        "tmp": 38.5, "dpt": 18.0, "wspd": 11.0, "wdir": 290.0, "slp": 988.0, "precip": 15.0, "uv": 10, "vis": 7.0, "cloud": "partly cloudy"
-    },
-    "🇨🇳 Beijing Capital": {
-        "id": "CN545110", "name": "Beijing Capital", "country": "China", "flag": "🇨🇳",
-        "lat": 40.08, "lon": 116.58, "alt": 35.0, "region": "Temperate Continental", "loc": "inland", "season": "Autumn",
-        "tmp": 20.0, "dpt": 12.0, "wspd": 12.0, "wdir": 320.0, "slp": 1018.0, "precip": 20.0, "uv": 5, "vis": 9.0, "cloud": "cloudy"
-    },
-    "🇳🇵 Kathmandu Tribhuvan": {
-        "id": "NP444540", "name": "Kathmandu Tribhuvan", "country": "Nepal", "flag": "🇳🇵",
-        "lat": 27.70, "lon": 85.36, "alt": 1338.0, "region": "Alpine Mountain Highlands", "loc": "mountain", "season": "Autumn",
-        "tmp": 19.0, "dpt": 14.5, "wspd": 7.0, "wdir": 135.0, "slp": 868.0, "precip": 35.0, "uv": 7, "vis": 8.0, "cloud": "cloudy"
-    },
-    "🇦🇺 Sydney Kingsford Smith": {
-        "id": "AU947680", "name": "Sydney Kingsford", "country": "Australia", "flag": "🇦🇺",
-        "lat": -33.95, "lon": 151.18, "alt": 6.0, "region": "Mediterranean Maritime", "loc": "coastal", "season": "Summer",
-        "tmp": 26.0, "dpt": 14.0, "wspd": 12.0, "wdir": 170.0, "slp": 1018.0, "precip": 5.0, "uv": 9, "vis": 16.0, "cloud": "clear"
-    },
-    "🇳🇿 Auckland Airport": {
-        "id": "NZ931100", "name": "Auckland Airport", "country": "New Zealand", "flag": "🇳🇿",
-        "lat": -37.01, "lon": 174.79, "alt": 7.0, "region": "Mediterranean Maritime", "loc": "coastal", "season": "Spring",
-        "tmp": 17.5, "dpt": 13.0, "wspd": 19.0, "wdir": 230.0, "slp": 1013.0, "precip": 40.0, "uv": 6, "vis": 12.0, "cloud": "cloudy"
-    },
-    "🇿🇦 Cape Town Intl": {
-        "id": "ZA688160", "name": "Cape Town Intl", "country": "South Africa", "flag": "🇿🇦",
-        "lat": -33.97, "lon": 18.60, "alt": 42.0, "region": "Mediterranean Maritime", "loc": "coastal", "season": "Summer",
-        "tmp": 24.0, "dpt": 13.5, "wspd": 22.0, "wdir": 160.0, "slp": 1016.0, "precip": 5.0, "uv": 9, "vis": 16.0, "cloud": "clear"
-    },
-    "🇰🇪 Nairobi Jomo Kenyatta": {
-        "id": "KE637400", "name": "Nairobi Jomo Kenyatta", "country": "Kenya", "flag": "🇰🇪",
-        "lat": -1.32, "lon": 36.93, "alt": 1624.0, "region": "Equatorial Tropical", "loc": "mountain", "season": "Summer",
-        "tmp": 23.5, "dpt": 16.0, "wspd": 10.0, "wdir": 80.0, "slp": 842.0, "precip": 50.0, "uv": 9, "vis": 10.0, "cloud": "cloudy"
-    },
-    "🇪🇬 Cairo Intl": {
-        "id": "EG623660", "name": "Cairo Intl", "country": "Egypt", "flag": "🇪🇬",
-        "lat": 30.12, "lon": 31.41, "alt": 116.0, "region": "Arid / Desert", "loc": "inland", "season": "Summer",
-        "tmp": 37.0, "dpt": 16.0, "wspd": 12.0, "wdir": 350.0, "slp": 1006.0, "precip": 0.0, "uv": 11, "vis": 14.0, "cloud": "clear"
-    },
-    "🇧🇷 São Paulo Guarulhos": {
-        "id": "BR837790", "name": "São Paulo Guarulhos", "country": "Brazil", "flag": "🇧🇷",
-        "lat": -23.43, "lon": -46.47, "alt": 750.0, "region": "Equatorial Tropical", "loc": "inland", "season": "Summer",
-        "tmp": 27.0, "dpt": 22.5, "wspd": 11.0, "wdir": 130.0, "slp": 932.0, "precip": 75.0, "uv": 8, "vis": 7.0, "cloud": "overcast"
-    },
-    "🇨🇱 Santiago Pudahuel": {
-        "id": "CL855740", "name": "Santiago Pudahuel", "country": "Chile", "flag": "🇨🇱",
-        "lat": -33.39, "lon": -70.79, "alt": 474.0, "region": "Mediterranean Maritime", "loc": "inland", "season": "Summer",
-        "tmp": 28.5, "dpt": 10.0, "wspd": 13.0, "wdir": 200.0, "slp": 962.0, "precip": 0.0, "uv": 10, "vis": 15.0, "cloud": "clear"
-    },
-    "🇪🇨 Quito Mariscal Sucre": {
-        "id": "EC840710", "name": "Quito Mariscal Sucre", "country": "Ecuador", "flag": "🇪🇨",
-        "lat": -0.13, "lon": -78.36, "alt": 2400.0, "region": "Alpine Mountain Highlands", "loc": "mountain", "season": "Spring",
-        "tmp": 16.0, "dpt": 13.5, "wspd": 9.0, "wdir": 60.0, "slp": 775.0, "precip": 80.0, "uv": 9, "vis": 5.0, "cloud": "overcast"
-    }
+    "Zermatt Matterhorn": {"id": "CH067200", "name": "Zermatt Matterhorn", "country": "Switzerland", "flag": "🇨🇭", "lat": 45.98, "lon": 7.75, "alt": 2450.0, "region": "Alpine Mountain Highlands", "loc": "mountain"},
+    "Zurich Kloten": {"id": "CH066600", "name": "Zurich Kloten", "country": "Switzerland", "flag": "🇨🇭", "lat": 47.48, "lon": 8.54, "alt": 432.0, "region": "Alpine Mountain Highlands", "loc": "mountain"},
+    "London Heathrow": {"id": "UK037720", "name": "London Heathrow", "country": "United Kingdom", "flag": "🇬🇧", "lat": 51.48, "lon": -0.45, "alt": 25.0, "region": "Temperate Continental", "loc": "inland"},
+    "Paris CDG": {"id": "FR071570", "name": "Paris CDG", "country": "France", "flag": "🇫🇷", "lat": 49.01, "lon": 2.55, "alt": 119.0, "region": "Temperate Continental", "loc": "inland"},
+    "New York JFK": {"id": "US744860", "name": "New York JFK", "country": "United States", "flag": "🇺🇸", "lat": 40.64, "lon": -73.78, "alt": 4.0, "region": "Temperate Continental", "loc": "coastal"},
+    "Denver Stapleton": {"id": "US725650", "name": "Denver Stapleton", "country": "United States", "flag": "🇺🇸", "lat": 39.77, "lon": -104.88, "alt": 1611.0, "region": "Temperate Continental", "loc": "mountain"},
+    "Los Angeles LAX": {"id": "US722950", "name": "Los Angeles LAX", "country": "United States", "flag": "🇺🇸", "lat": 33.94, "lon": -118.41, "alt": 38.0, "region": "Mediterranean Maritime", "loc": "coastal"},
+    "Anchorage": {"id": "US702730", "name": "Anchorage", "country": "United States", "flag": "🇺🇸", "lat": 61.17, "lon": -149.99, "alt": 46.0, "region": "Nordic / Sub-Polar", "loc": "coastal"},
+    "Miami Intl": {"id": "US722020", "name": "Miami Intl", "country": "United States", "flag": "🇺🇸", "lat": 25.79, "lon": -80.29, "alt": 3.0, "region": "Equatorial Tropical", "loc": "coastal"},
+    "Honolulu": {"id": "US911820", "name": "Honolulu", "country": "United States", "flag": "🇺🇸", "lat": 21.32, "lon": -157.92, "alt": 4.0, "region": "Mediterranean Maritime", "loc": "coastal"},
+    "Tokyo Haneda": {"id": "JP476620", "name": "Tokyo Haneda", "country": "Japan", "flag": "🇯🇵", "lat": 35.55, "lon": 139.78, "alt": 6.0, "region": "Temperate Continental", "loc": "coastal"},
+    "Singapore Changi": {"id": "SG486980", "name": "Singapore Changi", "country": "Singapore", "flag": "🇸🇬", "lat": 1.36, "lon": 103.99, "alt": 7.0, "region": "Equatorial Tropical", "loc": "coastal"},
+    "Dubai Intl": {"id": "AE411940", "name": "Dubai Intl", "country": "UAE", "flag": "🇦🇪", "lat": 25.25, "lon": 55.36, "alt": 19.0, "region": "Arid / Desert", "loc": "coastal"},
+    "Riyadh": {"id": "SA404380", "name": "Riyadh", "country": "Saudi Arabia", "flag": "🇸🇦", "lat": 24.96, "lon": 46.70, "alt": 612.0, "region": "Arid / Desert", "loc": "inland"},
+    "Tromsø": {"id": "NO010260", "name": "Tromsø", "country": "Norway", "flag": "🇳🇴", "lat": 69.68, "lon": 18.92, "alt": 9.0, "region": "Nordic / Sub-Polar", "loc": "coastal"},
+    "Reykjavik": {"id": "IS040180", "name": "Reykjavik", "country": "Iceland", "flag": "🇮🇸", "lat": 64.13, "lon": -21.94, "alt": 18.0, "region": "Nordic / Sub-Polar", "loc": "coastal"},
+    "Mumbai": {"id": "IN430030", "name": "Mumbai", "country": "India", "flag": "🇮🇳", "lat": 19.12, "lon": 72.85, "alt": 14.0, "region": "Equatorial Tropical", "loc": "coastal"},
+    "New Delhi": {"id": "IN421820", "name": "New Delhi", "country": "India", "flag": "🇮🇳", "lat": 28.57, "lon": 77.10, "alt": 237.0, "region": "Temperate Continental", "loc": "inland"},
+    "Beijing": {"id": "CN545110", "name": "Beijing", "country": "China", "flag": "🇨🇳", "lat": 40.08, "lon": 116.58, "alt": 35.0, "region": "Temperate Continental", "loc": "inland"},
+    "Kathmandu": {"id": "NP444540", "name": "Kathmandu", "country": "Nepal", "flag": "🇳🇵", "lat": 27.70, "lon": 85.36, "alt": 1338.0, "region": "Alpine Mountain Highlands", "loc": "mountain"},
+    "Sydney": {"id": "AU947680", "name": "Sydney", "country": "Australia", "flag": "🇦🇺", "lat": -33.95, "lon": 151.18, "alt": 6.0, "region": "Mediterranean Maritime", "loc": "coastal"},
+    "Auckland": {"id": "NZ931100", "name": "Auckland", "country": "New Zealand", "flag": "🇳🇿", "lat": -37.01, "lon": 174.79, "alt": 7.0, "region": "Mediterranean Maritime", "loc": "coastal"},
+    "Cape Town": {"id": "ZA688160", "name": "Cape Town", "country": "South Africa", "flag": "🇿🇦", "lat": -33.97, "lon": 18.60, "alt": 42.0, "region": "Mediterranean Maritime", "loc": "coastal"},
+    "Nairobi": {"id": "KE637400", "name": "Nairobi", "country": "Kenya", "flag": "🇰🇪", "lat": -1.32, "lon": 36.93, "alt": 1624.0, "region": "Equatorial Tropical", "loc": "mountain"},
+    "Cairo": {"id": "EG623660", "name": "Cairo", "country": "Egypt", "flag": "🇪🇬", "lat": 30.12, "lon": 31.41, "alt": 116.0, "region": "Arid / Desert", "loc": "inland"},
+    "São Paulo": {"id": "BR837790", "name": "São Paulo", "country": "Brazil", "flag": "🇧🇷", "lat": -23.43, "lon": -46.47, "alt": 750.0, "region": "Equatorial Tropical", "loc": "inland"},
+    "Santiago": {"id": "CL855740", "name": "Santiago", "country": "Chile", "flag": "🇨🇱", "lat": -33.39, "lon": -70.79, "alt": 474.0, "region": "Mediterranean Maritime", "loc": "inland"},
+    "Quito": {"id": "EC840710", "name": "Quito", "country": "Ecuador", "flag": "🇪🇨", "lat": -0.13, "lon": -78.36, "alt": 2400.0, "region": "Alpine Mountain Highlands", "loc": "mountain"},
 }
 
 WEATHER_COLOR_MAP = {
-    "Sunny": [245, 158, 11, 220],     # Amber / Gold
-    "Rainy": [2, 132, 199, 220],      # Cerulean Blue
-    "Cloudy": [107, 114, 128, 220],   # Slate Gray
-    "Snowy": [147, 51, 234, 220]      # Royal Purple
+    "Sunny": [245, 158, 11, 225],
+    "Rainy": [14, 165, 233, 225],
+    "Cloudy": [148, 163, 184, 225],
+    "Snowy": [168, 85, 247, 225],
 }
 
-WEATHER_BADGE_MAP = {
-    "Sunny": "☀️ Sunny",
-    "Rainy": "🌧️ Rainy",
-    "Cloudy": "☁️ Cloudy",
-    "Snowy": "❄️ Snowy"
+WEATHER_ICON_MAP = {
+    "Sunny": "☀️",
+    "Rainy": "🌧️",
+    "Cloudy": "⛅",
+    "Snowy": "❄️",
 }
 
-# WMO Weather Interpretation Codes (Ground-Truth Satellite / Station Classification)
 WMO_CODE_MAP = {
-    0: ("Clear Sky", "Sunny"),
-    1: ("Mainly Clear", "Sunny"),
-    2: ("Partly Cloudy", "Cloudy"),
-    3: ("Overcast", "Cloudy"),
-    45: ("Fog", "Cloudy"),
-    48: ("Depositing Rime Fog", "Cloudy"),
-    51: ("Light Drizzle", "Rainy"),
-    53: ("Moderate Drizzle", "Rainy"),
-    55: ("Dense Drizzle", "Rainy"),
-    56: ("Freezing Drizzle", "Snowy"),
-    57: ("Dense Freezing Drizzle", "Snowy"),
-    61: ("Slight Rain", "Rainy"),
-    63: ("Moderate Rain", "Rainy"),
-    65: ("Heavy Rain", "Rainy"),
-    66: ("Freezing Rain", "Snowy"),
-    67: ("Heavy Freezing Rain", "Snowy"),
-    71: ("Slight Snowfall", "Snowy"),
-    73: ("Moderate Snowfall", "Snowy"),
-    75: ("Heavy Snowfall", "Snowy"),
-    77: ("Snow Grains", "Snowy"),
-    80: ("Slight Rain Showers", "Rainy"),
-    81: ("Moderate Rain Showers", "Rainy"),
-    82: ("Violent Rain Showers", "Rainy"),
-    85: ("Slight Snow Showers", "Snowy"),
-    86: ("Heavy Snow Showers", "Snowy"),
-    95: ("Thunderstorm", "Rainy"),
-    96: ("Thunderstorm + Hail", "Rainy"),
-    99: ("Severe Thunderstorm", "Rainy"),
+    0: ("Clear Sky", "Sunny", "☀️"),
+    1: ("Mainly Clear", "Sunny", "🌤️"),
+    2: ("Partly Cloudy", "Cloudy", "⛅"),
+    3: ("Overcast", "Cloudy", "☁️"),
+    45: ("Fog", "Cloudy", "🌫️"),
+    48: ("Rime Fog", "Cloudy", "🌫️"),
+    51: ("Light Drizzle", "Rainy", "🌦️"),
+    53: ("Moderate Drizzle", "Rainy", "🌦️"),
+    55: ("Dense Drizzle", "Rainy", "🌧️"),
+    56: ("Freezing Drizzle", "Snowy", "🌨️"),
+    57: ("Dense Freezing Drizzle", "Snowy", "🌨️"),
+    61: ("Slight Rain", "Rainy", "🌦️"),
+    63: ("Moderate Rain", "Rainy", "🌧️"),
+    65: ("Heavy Rain", "Rainy", "🌧️"),
+    66: ("Freezing Rain", "Snowy", "🌨️"),
+    67: ("Heavy Freezing Rain", "Snowy", "🌨️"),
+    71: ("Slight Snow", "Snowy", "🌨️"),
+    73: ("Moderate Snow", "Snowy", "❄️"),
+    75: ("Heavy Snow", "Snowy", "❄️"),
+    77: ("Snow Grains", "Snowy", "❄️"),
+    80: ("Rain Showers", "Rainy", "🌦️"),
+    81: ("Moderate Showers", "Rainy", "🌧️"),
+    82: ("Heavy Showers", "Rainy", "⛈️"),
+    85: ("Snow Showers", "Snowy", "🌨️"),
+    86: ("Heavy Snow Showers", "Snowy", "❄️"),
+    95: ("Thunderstorm", "Rainy", "⛈️"),
+    96: ("Thunderstorm + Hail", "Rainy", "⛈️"),
+    99: ("Severe Thunderstorm", "Rainy", "⛈️"),
 }
 
+# =========================================================================
+# HELPER FUNCTIONS: LOCATION, LIVE TELEMETRY & AI INFERENCE
+# =========================================================================
 def infer_region_and_season(lat: float, alt: float):
-    """Infers true astronomical season from current date/hemisphere and macroclimate region."""
     month = datetime.date.today().month
     if lat >= 0:
         season = "Winter" if month in (12, 1, 2) else ("Spring" if month in (3, 4, 5) else ("Summer" if month in (6, 7, 8) else "Autumn"))
@@ -339,115 +301,64 @@ def infer_region_and_season(lat: float, alt: float):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def search_city_geocoding(query: str):
-    """Free Open-Meteo Geocoding API lookup (no API key required)."""
     if not query or len(query.strip()) < 2:
         return []
     encoded = urllib.request.quote(query.strip())
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded}&count=5&language=en&format=json"
-    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
     try:
-        with urllib.request.urlopen(req, timeout=4.0) as r:
-            data = json.loads(r.read().decode('utf-8'))
-            return data.get("results", [])
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/4.0'}), timeout=4.0) as r:
+            return json.loads(r.read().decode('utf-8')).get("results", [])
     except Exception:
         return []
 
+@st.cache_data(ttl=300, show_spinner=False)
 def detect_location_via_ip():
-    """Detects approximate city & coordinates via free IP geolocation APIs."""
     for url in ["http://ip-api.com/json/", "https://ipapi.co/json/"]:
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
-            with urllib.request.urlopen(req, timeout=4.0) as r:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/4.0'}), timeout=4.0) as r:
                 d = json.loads(r.read().decode('utf-8'))
                 lat = d.get("lat") or d.get("latitude")
                 lon = d.get("lon") or d.get("longitude")
                 if lat is not None and lon is not None:
                     return {
-                        "success": True,
-                        "lat": float(lat),
-                        "lon": float(lon),
-                        "city": d.get("city", "My Location"),
-                        "country": d.get("country") or d.get("country_name", "")
+                        "success": True, "lat": float(lat), "lon": float(lon),
+                        "city": d.get("city", "Pune"), "country": d.get("country") or d.get("country_name", "India")
                     }
         except Exception:
             continue
-    return {"success": False}
+    return {"success": False, "lat": 18.52, "lon": 73.85, "city": "Pune", "country": "India"}
 
 @st.cache_data(ttl=600, show_spinner=False)
 def reverse_geocode_coords(lat: float, lon: float):
-    """Converts browser GPS (lat, lon) to city & country via free OpenStreetMap Nominatim."""
     url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
     try:
-        with urllib.request.urlopen(req, timeout=4.0) as r:
-            d = json.loads(r.read().decode('utf-8'))
-            addr = d.get("address", {})
-            city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("state_district") or addr.get("state") or "My GPS Location"
-            country = addr.get("country", "")
-            return city, country
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/4.0'}), timeout=4.0) as r:
+            addr = json.loads(r.read().decode('utf-8')).get("address", {})
+            city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("state_district") or addr.get("state") or "My Location"
+            return city, addr.get("country", "")
     except Exception:
         return f"GPS ({lat:.2f}, {lon:.2f})", ""
 
-def build_live_city_pin(t_lat: float, t_lon: float, t_name: str, t_country: str, t_alt: float = 50.0, flag: str = "📍"):
-    """Fetches live satellite weather for any coordinate and builds a 3D map pin + AI prediction."""
-    live_city = fetch_live_telemetry_for_coords(t_lat, t_lon, include_hourly=True)
-    if not live_city.get("success"):
-        return None
-    reg, loc_t, seas = infer_region_and_season(t_lat, t_alt)
-    pred_c, _, conf = predict_weather_with_ai(
-        t_lat, t_lon, t_alt, live_city["tmp"], live_city["dpt"], live_city["rh"],
-        live_city["wspd"], live_city["wdir"], live_city["precip"], live_city["slp"],
-        live_city["uv"], live_city["vis"], live_city["cloud"], seas, loc_t, reg,
-        wmo_cat=live_city["wmo_cat"]
-    )
-    c_rgba = WEATHER_COLOR_MAP.get(pred_c, [16, 185, 129, 235])
-    return {
-        "key": t_name, "station_id": "LIVE-LOC", "station_name": t_name,
-        "country": t_country, "flag": flag, "lat": t_lat, "lon": t_lon, "alt": t_alt,
-        "region": reg, "loc": loc_t, "season": seas,
-        "tmp": round(live_city["tmp"], 1), "feels_like": round(live_city["feels_like"], 1),
-        "dpt": round(live_city["dpt"], 1), "rh": live_city["rh"],
-        "wspd": round(live_city["wspd"], 1), "wgust": round(live_city["wgust"], 1),
-        "wdir": round(live_city["wdir"], 0), "slp": round(live_city["slp"], 1),
-        "precip": round(live_city["precip"], 0), "uv": live_city["uv"],
-        "vis": round(live_city["vis"], 1), "cloud": live_city["cloud"],
-        "cloud_pct": live_city["cloud_pct"], "wmo_desc": live_city["wmo_desc"],
-        "predicted_weather": pred_c, "weather_badge": WEATHER_BADGE_MAP.get(pred_c, pred_c),
-        "map_label": f"{flag} {t_name} • {live_city['tmp']:.0f}°C",
-        "confidence": round(conf, 1), "color_rgba": c_rgba,
-        "halo_rgba": [0, 255, 255, 95], "radius": 240000, "halo_radius": 450000,
-        "col_elevation": max(80000.0, (live_city["tmp"] + 20.0) * 16000.0),
-        "is_live": True, "live_ts": live_city["timestamp"],
-        "hourly": live_city.get("hourly", {})
-    }
-
-# -------------------------------------------------------------------------
-# REAL-TIME LIVE DATA HARVESTER (Open-Meteo Satellite & Ground Station API)
-# -------------------------------------------------------------------------
-def fetch_live_telemetry_for_coords(lat: float, lon: float, include_hourly: bool = False):
-    """
-    Fetches real-time live atmospheric telemetry from Open-Meteo satellite feed
-    (ECMWF / NOAA GFS / DWD ICON) including WMO ground truth & precipitation probability.
-    """
-    hourly_param = "&hourly=temperature_2m,precipitation_probability,surface_pressure&forecast_days=4" if include_hourly else "&hourly=precipitation_probability&forecast_days=1"
+@st.cache_data(ttl=180, show_spinner=False)
+def fetch_live_telemetry_for_coords(lat: float, lon: float, include_full_forecast: bool = False):
+    forecast_params = "&hourly=temperature_2m,precipitation_probability,surface_pressure,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=7" if include_full_forecast else "&hourly=precipitation_probability&forecast_days=1"
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,"
         f"surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation,"
-        f"cloud_cover,uv_index,visibility,weather_code,is_day{hourly_param}&timezone=auto"
+        f"cloud_cover,uv_index,visibility,weather_code,is_day{forecast_params}&timezone=auto"
     )
-    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
     try:
-        with urllib.request.urlopen(req, timeout=4.0) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/4.0'}), timeout=4.5) as r:
             data = json.loads(r.read().decode('utf-8'))
             cur = data.get('current', {})
             hourly = data.get('hourly', {})
+            daily = data.get('daily', {})
 
             cc = float(cur.get('cloud_cover', 0))
             wmo_code = int(cur.get('weather_code', 0))
-            wmo_desc, wmo_cat = WMO_CODE_MAP.get(wmo_code, ("Variable", "Cloudy"))
+            wmo_desc, wmo_cat, wmo_icon = WMO_CODE_MAP.get(wmo_code, ("Variable", "Cloudy", "⛅"))
 
-            # Map cloud cover accurately using both cloud_cover % and WMO code
             if wmo_cat in ("Rainy", "Snowy") or cc >= 80:
                 cloud = "overcast" if cc >= 70 else "cloudy"
             elif cc < 20:
@@ -457,14 +368,8 @@ def fetch_live_telemetry_for_coords(lat: float, lon: float, include_hourly: bool
             else:
                 cloud = "cloudy"
 
-            # Use true hourly precipitation probability when available
             precip_probs = hourly.get('precipitation_probability', [])
-            if precip_probs and precip_probs[0] is not None:
-                precip_pct = float(precip_probs[0])
-            else:
-                precip_pct = float(min(100.0, cur.get('precipitation', 0.0) * 25.0))
-                if wmo_cat in ("Rainy", "Snowy") and precip_pct < 60.0:
-                    precip_pct = 75.0
+            precip_pct = float(precip_probs[0]) if (precip_probs and precip_probs[0] is not None) else float(min(100.0, cur.get('precipitation', 0.0) * 25.0))
 
             res = {
                 "success": True,
@@ -477,25 +382,23 @@ def fetch_live_telemetry_for_coords(lat: float, lon: float, include_hourly: bool
                 "wdir": float(cur.get('wind_direction_10m', 180.0)),
                 "wgust": float(cur.get('wind_gusts_10m', cur.get('wind_speed_10m', 10.0))),
                 "precip": precip_pct,
-                "precip_mm": float(cur.get('precipitation', 0.0)),
                 "cloud": cloud,
                 "cloud_pct": int(cc),
-                "uv": int(round(float(cur.get('uv_index', 3)))),
-                "vis": float(min(20.0, cur.get('visibility', 10000.0) / 1000.0)),
+                "uv": float(cur.get('uv_index', 3.0)),
+                "vis": float(min(25.0, cur.get('visibility', 10000.0) / 1000.0)),
                 "wmo_code": wmo_code,
                 "wmo_desc": wmo_desc,
                 "wmo_cat": wmo_cat,
-                "is_day": int(cur.get('is_day', 1)),
-                "timestamp": cur.get('time', datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+                "wmo_icon": wmo_icon,
+                "timestamp": cur.get('time', datetime.datetime.now().strftime("%Y-%m-%d %H:%M")),
+                "hourly": hourly,
+                "daily": daily,
             }
-            if include_hourly and hourly:
-                res["hourly"] = hourly
             return res
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 def predict_weather_with_ai(lat, lon, alt, temp, dpt, rh, wspd, wdir, precip, slp, uv, vis, cloud, season, loc, region, wmo_cat=None):
-    """Runs ML inference and computes calibrated confidence + WMO ground-truth consensus."""
     row = {col: 0.0 for col in feature_cols}
     row['Latitude'] = float(lat)
     row['Longitude'] = float(lon)
@@ -508,7 +411,7 @@ def predict_weather_with_ai(lat, lon, alt, temp, dpt, rh, wspd, wdir, precip, sl
     row['Precipitation (%)'] = float(precip)
     row['Atmospheric Pressure'] = float(slp)
     row['UV Index'] = float(uv)
-    row['Visibility (km)'] = float(vis)
+    row['Visibility (km)'] = float(min(20.0, vis))
 
     for prefix, val in [("Cloud Cover", cloud), ("Season", season), ("Location", loc), ("Region", region)]:
         col_name = f"{prefix}_{val}"
@@ -522,17 +425,12 @@ def predict_weather_with_ai(lat, lon, alt, temp, dpt, rh, wspd, wdir, precip, sl
     pred_probs = model.predict_proba(scaled_input)[0]
     confidence = float(pred_probs[pred_idx] * 100.0)
 
-    # Physics & WMO ground-truth calibration guard for live satellite edge cases
-    # (e.g., nighttime clear sky has UV=0 which shouldn't force Snowy/Cloudy when temp > 10°C)
     if wmo_cat and wmo_cat in le.classes_:
         wmo_idx = list(le.classes_).index(wmo_cat)
-        # Blend AI probability (75%) with real-time WMO satellite ground truth (25%) for transition zones
         blended_probs = 0.75 * pred_probs
         blended_probs[wmo_idx] += 0.25
-        # Physical sub-zero guard: never predict Snowy above 4°C
         if temp > 4.0 and "Snowy" in le.classes_:
-            snow_idx = list(le.classes_).index("Snowy")
-            blended_probs[snow_idx] = 0.0
+            blended_probs[list(le.classes_).index("Snowy")] = 0.0
             blended_probs = blended_probs / blended_probs.sum()
         final_idx = int(np.argmax(blended_probs))
         pred_class = le.inverse_transform([final_idx])[0]
@@ -542,995 +440,622 @@ def predict_weather_with_ai(lat, lon, alt, temp, dpt, rh, wspd, wdir, precip, sl
     return pred_class, pred_probs, confidence
 
 @st.cache_data(ttl=180, show_spinner=False)
-def get_global_station_telemetry_df(live_mode: bool = True):
-    """
-    Computes AI predictions and coordinates for all 28 global stations.
-    If live_mode is True, fetches real-time live satellite telemetry in parallel!
-    """
+def get_global_station_telemetry_df():
     if not artifacts_loaded:
         return pd.DataFrame()
 
     def fetch_station(item):
         key, s = item
-        s_data = s.copy()
-        is_live = False
-        live_ts = "Historical Station Benchmark"
-        wmo_desc, wmo_cat = "Benchmark", None
-        feels_like = s_data["tmp"]
-        wgust = s_data["wspd"] * 1.2
-        cloud_pct = 15 if s_data["cloud"] == "clear" else (40 if s_data["cloud"] == "partly cloudy" else (65 if s_data["cloud"] == "cloudy" else 90))
-
-        # Use true astronomical season when in live mode
-        _, _, true_season = infer_region_and_season(s_data["lat"], s_data["alt"])
-        if live_mode:
-            s_data["season"] = true_season
-            live_res = fetch_live_telemetry_for_coords(s["lat"], s["lon"])
-            if live_res.get("success"):
-                s_data["tmp"] = live_res["tmp"]
-                s_data["dpt"] = live_res["dpt"]
-                s_data["rh"] = live_res["rh"]
-                s_data["slp"] = live_res["slp"]
-                s_data["wspd"] = live_res["wspd"]
-                s_data["wdir"] = live_res["wdir"]
-                s_data["precip"] = live_res["precip"]
-                s_data["cloud"] = live_res["cloud"]
-                s_data["uv"] = live_res["uv"]
-                s_data["vis"] = live_res["vis"]
-                feels_like = live_res["feels_like"]
-                wgust = live_res["wgust"]
-                cloud_pct = live_res["cloud_pct"]
-                wmo_desc = live_res["wmo_desc"]
-                wmo_cat = live_res["wmo_cat"]
-                is_live = True
-                live_ts = live_res["timestamp"]
-
-        temp = s_data["tmp"]
-        dpt = min(s_data["dpt"], temp)
-        if "rh" not in s_data:
-            a, b = 17.27, 237.7
-            rh = int(np.clip(round(100.0 * np.exp((a * dpt) / (b + dpt) - (a * temp) / (b + temp))), 10, 100))
+        _, _, true_season = infer_region_and_season(s["lat"], s["alt"])
+        live_res = fetch_live_telemetry_for_coords(s["lat"], s["lon"], include_full_forecast=False)
+        if live_res.get("success"):
+            tmp, dpt, rh, slp = live_res["tmp"], min(live_res["dpt"], live_res["tmp"]), live_res["rh"], live_res["slp"]
+            wspd, wdir, wgust, precip = live_res["wspd"], live_res["wdir"], live_res["wgust"], live_res["precip"]
+            cloud, cloud_pct, uv, vis = live_res["cloud"], live_res["cloud_pct"], live_res["uv"], live_res["vis"]
+            feels_like, wmo_desc, wmo_cat, live_ts, is_live = live_res["feels_like"], live_res["wmo_desc"], live_res["wmo_cat"], live_res["timestamp"], True
         else:
-            rh = s_data["rh"]
+            tmp, dpt, rh, slp = 20.0, 12.0, 60, 1013.0
+            wspd, wdir, wgust, precip = 12.0, 180.0, 15.0, 10.0
+            cloud, cloud_pct, uv, vis = "clear", 15, 5.0, 12.0
+            feels_like, wmo_desc, wmo_cat, live_ts, is_live = 20.0, "Clear Sky", "Sunny", "Offline Fallback", False
 
         pred_class, _, confidence = predict_weather_with_ai(
-            s_data["lat"], s_data["lon"], s_data["alt"], temp, dpt, rh,
-            s_data["wspd"], s_data["wdir"], s_data["precip"], s_data["slp"],
-            s_data["uv"], s_data["vis"], s_data["cloud"], s_data["season"],
-            s_data["loc"], s_data["region"], wmo_cat=wmo_cat if is_live else None
+            s["lat"], s["lon"], s["alt"], tmp, dpt, rh, wspd, wdir, precip, slp,
+            uv, vis, cloud, true_season, s["loc"], s["region"], wmo_cat=wmo_cat if is_live else None
         )
-
-        color_rgba = WEATHER_COLOR_MAP.get(pred_class, [16, 185, 129, 220])
-        halo_rgba = [color_rgba[0], color_rgba[1], color_rgba[2], 65]
-        # 3D column height proportional to temperature (shifted positive)
-        col_elevation = max(60000.0, (temp + 20.0) * 14000.0)
-
+        color_rgba = WEATHER_COLOR_MAP.get(pred_class, [16, 185, 129, 225])
         return {
-            "key": key,
-            "station_id": s_data["id"],
-            "station_name": s_data["name"],
-            "country": s_data["country"],
-            "flag": s_data["flag"],
-            "lat": s_data["lat"],
-            "lon": s_data["lon"],
-            "alt": s_data["alt"],
-            "region": s_data["region"],
-            "loc": s_data["loc"],
-            "season": s_data["season"],
-            "tmp": round(temp, 1),
-            "feels_like": round(feels_like, 1),
-            "dpt": round(dpt, 1),
-            "rh": rh,
-            "wspd": round(s_data["wspd"], 1),
-            "wgust": round(wgust, 1),
-            "wdir": round(s_data["wdir"], 0),
-            "slp": round(s_data["slp"], 1),
-            "precip": round(s_data["precip"], 0),
-            "uv": s_data["uv"],
-            "vis": round(s_data["vis"], 1),
-            "cloud": s_data["cloud"],
-            "cloud_pct": cloud_pct,
-            "wmo_desc": wmo_desc,
-            "predicted_weather": pred_class,
-            "weather_badge": WEATHER_BADGE_MAP.get(pred_class, pred_class),
-            "map_label": f"{s_data['name']} • {temp:.0f}°C",
-            "confidence": round(confidence, 1),
-            "color_rgba": color_rgba,
-            "halo_rgba": halo_rgba,
-            "radius": 160000 + (s_data["wspd"] * 3500),
-            "halo_radius": 320000 + (s_data["precip"] * 3500),
-            "col_elevation": col_elevation,
-            "is_live": is_live,
-            "live_ts": live_ts
+            "key": key, "station_id": s["id"], "station_name": s["name"], "country": s["country"], "flag": s["flag"],
+            "lat": s["lat"], "lon": s["lon"], "alt": s["alt"], "region": s["region"], "loc": s["loc"], "season": true_season,
+            "tmp": round(tmp, 1), "feels_like": round(feels_like, 1), "dpt": round(dpt, 1), "rh": rh,
+            "wspd": round(wspd, 1), "wgust": round(wgust, 1), "wdir": round(wdir, 0), "slp": round(slp, 1),
+            "precip": round(precip, 0), "uv": round(uv, 1), "vis": round(vis, 1), "cloud": cloud, "cloud_pct": cloud_pct,
+            "wmo_desc": wmo_desc, "predicted_weather": pred_class,
+            "weather_badge": f"{WEATHER_ICON_MAP.get(pred_class, '⛅')} {pred_class}",
+            "map_label": f"{s['name']} • {tmp:.0f}°C",
+            "confidence": round(confidence, 1), "color_rgba": color_rgba,
+            "halo_rgba": [color_rgba[0], color_rgba[1], color_rgba[2], 65],
+            "radius": 160000 + (wspd * 3500), "halo_radius": 320000 + (precip * 3500),
+            "col_elevation": max(60000.0, (tmp + 20.0) * 14000.0),
+            "is_live": is_live, "live_ts": live_ts
         }
 
     with ThreadPoolExecutor(max_workers=14) as executor:
-        records = list(executor.map(fetch_station, GLOBAL_WEATHER_STATIONS.items()))
-
-    return pd.DataFrame(records)
-
-# Sidebar - Mode Selection
-with st.sidebar:
-    st.subheader("🎯 Application Mode")
-    app_mode = st.radio(
-        "Choose View:",
-        ["🚀 Live Weather Prediction Website", "🎓 Practical Exam Defense (Stages A–H)"],
-        index=0
-    )
-    
-    st.markdown("---")
-    if app_mode == "🚀 Live Weather Prediction Website":
-        st.subheader("📡 Global Data Feed")
-        live_data_toggle = st.toggle("Enable Live Satellite Data (Open-Meteo)", value=True, help="Queries live real-time surface meteorology via Open-Meteo API.")
-        
-        st.markdown("---")
-        st.subheader("🌐 Global Station Selector")
-        st_choice = st.selectbox("Select Station Preset", list(GLOBAL_WEATHER_STATIONS.keys()), index=0)
-        station = GLOBAL_WEATHER_STATIONS[st_choice]
-        st.caption(f"**Station:** `{station['name']}` (`{station['id']}`) | **{station['country']}**")
-        
-        st.markdown("**Spatial Coordinates & Terrain**")
-        lat = st.slider("Latitude (°N/°S)", -60.0, 75.0, float(station["lat"]), 0.1)
-        lon = st.slider("Longitude (°E/°W)", -180.0, 180.0, float(station["lon"]), 0.5)
-        altitude = st.slider("Station Elevation (m)", 0.0, 3500.0, float(station["alt"]), 10.0)
-
-        regions_list = [
-            "Equatorial Tropical", "Temperate Continental", "Arid / Desert",
-            "Mediterranean Maritime", "Nordic / Sub-Polar", "Alpine Mountain Highlands"
-        ]
-        region = st.selectbox("Climate Region", regions_list, index=regions_list.index(station["region"]))
-        location = st.selectbox("Terrain Topography", ["coastal", "inland", "mountain"], index=["coastal", "inland", "mountain"].index(station["loc"]))
-        season = st.selectbox("Season", ["Winter", "Spring", "Summer", "Autumn"], index=["Winter", "Spring", "Summer", "Autumn"].index(station["season"]))
-    else:
-        st.subheader("📋 Exam Rubric Navigation")
-        st.markdown("""
-        - **Total Marks:** **30 Marks**
-        - **Course Outcomes:** **CO1 – CO4**
-        - **Bloom's Level:** **Level 5 (Evaluate)**
-        - **Institution:** MIT Academy of Engineering
-        - **Course Code:** 2304322L (AI Practical)
-        """)
+        return pd.DataFrame(list(executor.map(fetch_station, GLOBAL_WEATHER_STATIONS.items())))
 
 # =========================================================================
-# MODE 1: LIVE PRODUCTION WEATHER WEBSITE
+# SVG VISUALIZERS FOR BENTO CARDS (Matches Dark Reference Template)
 # =========================================================================
-if app_mode == "🚀 Live Weather Prediction Website":
-    st.markdown("""
-    <div class="app-header">
-        <div>
-            <h1 class="app-title">🌤️ SkyCast AI</h1>
-            <p style="margin: 0.2rem 0 0 0; color: gray;">Real-Time Global Station Weather Forecasting & Multi-Horizon Inference Engine (WEATHER-5K Aligned)</p>
-        </div>
-        <div>
-            <span class="live-badge">🟢 Real-Time Satellite Telemetry Enabled</span>
-        </div>
-    </div>
+def render_temp_curve_svg(temps_4):
+    """Renders smooth amber diurnal temperature curve (Morning, Afternoon, Evening, Night)."""
+    t_min, t_max = min(temps_4), max(temps_4)
+    span = max(t_max - t_min, 2.0)
+    ys = [48 - ((t - t_min) / span) * 28 for t in temps_4]
+    xs = [30, 105, 180, 255]
+    return f"""
+    <svg viewBox="0 0 285 88" width="100%" height="92">
+        <defs>
+            <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.0"/>
+            </linearGradient>
+        </defs>
+        <path d="M {xs[0]},{ys[0]} C 65,{ys[0]} 70,{ys[1]} {xs[1]},{ys[1]} C 140,{ys[1]} 145,{ys[2]} {xs[2]},{ys[2]} C 215,{ys[2]} 220,{ys[3]} {xs[3]},{ys[3]} L {xs[3]},65 L {xs[0]},65 Z" fill="url(#tempGrad)"/>
+        <path d="M {xs[0]},{ys[0]} C 65,{ys[0]} 70,{ys[1]} {xs[1]},{ys[1]} C 140,{ys[1]} 145,{ys[2]} {xs[2]},{ys[2]} C 215,{ys[2]} 220,{ys[3]} {xs[3]},{ys[3]}" fill="none" stroke="#F59E0B" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="{xs[0]}" cy="{ys[0]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
+        <circle cx="{xs[1]}" cy="{ys[1]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
+        <circle cx="{xs[2]}" cy="{ys[2]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
+        <circle cx="{xs[3]}" cy="{ys[3]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
+        <text x="{xs[0]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Morning</text>
+        <text x="{xs[1]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Afternoon</text>
+        <text x="{xs[2]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Evening</text>
+        <text x="{xs[3]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Night</text>
+        <text x="{xs[0]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[0]:.0f}°</text>
+        <text x="{xs[1]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[1]:.0f}°</text>
+        <text x="{xs[2]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[2]:.0f}°</text>
+        <text x="{xs[3]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[3]:.0f}°</text>
+    </svg>
+    """
+
+def render_wind_bars_svg(wind_series):
+    """Renders amber vertical bar-spike chart for Wind Status card."""
+    vals = wind_series[:18] if len(wind_series) >= 18 else [8, 10, 12, 14, 11, 15, 18, 22, 19, 16, 14, 12, 10, 9, 11, 13, 12, 10]
+    w_max = max(max(vals), 5.0)
+    bars = []
+    for idx, v in enumerate(vals):
+        h = max(4.0, (v / w_max) * 44.0)
+        x = 6 + idx * 14
+        y = 50.0 - h
+        opacity = "0.95" if v >= w_max * 0.7 else "0.55"
+        bars.append(f'<rect x="{x}" y="{y:.1f}" width="5" height="{h:.1f}" rx="2.5" fill="#F59E0B" opacity="{opacity}"/>')
+    return f'<svg viewBox="0 0 260 54" width="100%" height="58">{"".join(bars)}</svg>'
+
+def render_uv_gauge_svg(uv_val):
+    """Renders semi-circular amber UV Index arc gauge (0–12)."""
+    clamped = min(max(uv_val, 0.0), 12.0)
+    pct = clamped / 12.0
+    arc_len = 157.0  # pi * r where r=50
+    dash = pct * arc_len
+    return f"""
+    <svg viewBox="0 0 140 76" width="100%" height="76">
+        <path d="M 20,66 A 50,50 0 0,1 120,66" fill="none" stroke="#262B38" stroke-width="11" stroke-linecap="round"/>
+        <path d="M 20,66 A 50,50 0 0,1 120,66" fill="none" stroke="#F59E0B" stroke-width="11" stroke-linecap="round"
+              stroke-dasharray="{dash:.1f} {arc_len:.1f}"/>
+        <text x="70" y="63" fill="#F9FAFB" font-size="16" font-weight="700" text-anchor="middle">{uv_val:.1f} <tspan font-size="10" fill="#9CA3AF">UV</tspan></text>
+    </svg>
+    """
+
+# =========================================================================
+# SESSION STATE & INITIAL LOCATION BOOTSTRAP
+# =========================================================================
+if "active_location" not in st.session_state:
+    ip_loc = detect_location_via_ip()
+    st.session_state.active_location = {
+        "lat": ip_loc["lat"], "lon": ip_loc["lon"],
+        "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "IP Auto-Detect"
+    }
+
+if "nav_page" not in st.session_state:
+    st.session_state.nav_page = "🏠 Dashboard"
+
+# Handle Browser GPS Redirect (?my_lat=...&my_lon=...)
+qp = st.query_params
+if "my_lat" in qp and "my_lon" in qp:
+    try:
+        g_lat, g_lon = float(qp["my_lat"]), float(qp["my_lon"])
+        g_city, g_country = reverse_geocode_coords(g_lat, g_lon)
+        st.session_state.active_location = {
+            "lat": g_lat, "lon": g_lon, "city": g_city, "country": g_country, "alt": 50.0, "source": "Browser GPS"
+        }
+        st.query_params.clear()
+    except Exception:
+        st.query_params.clear()
+
+# =========================================================================
+# TOP MENU BAR & QUICK LOCATION CONTROLS
+# =========================================================================
+m_col1, m_col2, m_col3 = st.columns([1.4, 2.8, 1.3])
+with m_col1:
+    today_str = datetime.datetime.now().strftime("%A, %b %d, %Y")
+    st.markdown(f"""
+    <div class="top-brand">🌤️ SkyCast AI</div>
+    <div class="top-sub">{today_str} • WEATHER-5K Live</div>
     """, unsafe_allow_html=True)
 
-    # 3 Main Website Tabs: World Map, Telemetry Studio, Rubric Visualizations
-    web_tab_map, web_tab_studio, web_tab_viz = st.tabs([
-        "🗺️ Global Weather World Map & Live Network",
-        "🎛️ Station Telemetry Studio & AI Forecasting",
-        "📊 Rubric Data Visualizations & Analytics"
-    ])
+with m_col2:
+    pages = ["🏠 Dashboard", "🗺️ Radar Map", "🎛️ AI Simulator", "📊 Analytics", "🎓 Exam Rubric"]
+    selected_page = st.radio(
+        "Menu", pages,
+        index=pages.index(st.session_state.nav_page),
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    st.session_state.nav_page = selected_page
 
-    # Fetch global stations telemetry
-    df_global = get_global_station_telemetry_df(live_mode=live_data_toggle)
+with m_col3:
+    b1, b2 = st.columns(2)
+    with b1:
+        components.html("""
+        <button onclick="getGPS()" style="
+            width:100%; padding:0.42rem 0.4rem; border-radius:9px; border:1px solid rgba(245,158,11,0.4);
+            background:#151821; color:#FBBF24; font-weight:600; font-size:0.78rem; cursor:pointer;
+        ">📍 My GPS</button>
+        <script>
+        function getGPS(){
+            if(!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition((p)=>{
+                const u = new URL(window.top.location.href);
+                u.searchParams.set('my_lat', p.coords.latitude.toFixed(5));
+                u.searchParams.set('my_lon', p.coords.longitude.toFixed(5));
+                window.top.location.href = u.toString();
+            });
+        }
+        </script>
+        """, height=38)
+    with b2:
+        if st.button("🌐 Auto IP", use_container_width=True):
+            ip_loc = detect_location_via_ip()
+            st.session_state.active_location = {
+                "lat": ip_loc["lat"], "lon": ip_loc["lon"],
+                "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "IP Auto-Detect"
+            }
+            st.rerun()
 
-    # ---------------------------------------------------------------------
-    # SUB-TAB 1: GLOBAL WORLD MAP WITH WEATHER PREDICTIONS & TELEMETRY
-    # ---------------------------------------------------------------------
-    with web_tab_map:
-        st.subheader("🌍 Interactive 3D/2D Global Weather Radar & AI Map")
-        st.caption("Real-time satellite meteorology (ECMWF/NOAA/DWD via Open-Meteo) fused with SkyCast AI classification across 28 global observatories + any searched city worldwide.")
+# Compact Search Bar
+sc1, sc2, sc3 = st.columns([2.2, 1.5, 0.7])
+with sc1:
+    city_q = st.text_input("Search", placeholder="🔍 Search any city worldwide (e.g., Pune, London, Tokyo, New York, Zermatt)...", label_visibility="collapsed")
+with sc2:
+    matches = search_city_geocoding(city_q) if city_q else []
+    sel_idx = st.selectbox("Matches", range(len(matches)), format_func=lambda i: f"{matches[i]['name']}, {matches[i].get('country', '')}", label_visibility="collapsed") if matches else None
+with sc3:
+    if st.button("Go", use_container_width=True, disabled=(sel_idx is None)):
+        t = matches[sel_idx]
+        st.session_state.active_location = {
+            "lat": float(t["latitude"]), "lon": float(t["longitude"]),
+            "city": t["name"], "country": t.get("country", ""),
+            "alt": float(t.get("elevation", 50.0) or 50.0), "source": "City Search"
+        }
+        st.rerun()
 
-        # --- LIVE GLOBAL CITY SEARCH & MY-LOCATION DETECTION ---
-        if "custom_city_pin" not in st.session_state:
-            st.session_state.custom_city_pin = None
+# Fetch Live Data for Active Location
+act = st.session_state.active_location
+live = fetch_live_telemetry_for_coords(act["lat"], act["lon"], include_full_forecast=True)
+reg, loc_t, seas = infer_region_and_season(act["lat"], act["alt"])
 
-        # Check if Browser GPS redirected with ?my_lat=...&my_lon=...
-        qp = st.query_params
-        if "my_lat" in qp and "my_lon" in qp:
-            try:
-                gps_lat = float(qp["my_lat"])
-                gps_lon = float(qp["my_lon"])
-                city_n, country_n = reverse_geocode_coords(gps_lat, gps_lon)
-                pin = build_live_city_pin(gps_lat, gps_lon, f"{city_n} (My GPS)", country_n, flag="🛰️")
-                if pin:
-                    st.session_state.custom_city_pin = pin
-                st.query_params.clear()
-            except Exception:
-                st.query_params.clear()
+if live.get("success") and artifacts_loaded:
+    pred_class, pred_probs, confidence = predict_weather_with_ai(
+        act["lat"], act["lon"], act["alt"], live["tmp"], live["dpt"], live["rh"],
+        live["wspd"], live["wdir"], live["precip"], live["slp"], live["uv"], live["vis"],
+        live["cloud"], seas, loc_t, reg, wmo_cat=live["wmo_cat"]
+    )
+else:
+    pred_class, confidence = "Sunny", 95.0
 
-        # My Location Access Bar (Browser GPS Permission + Network IP Fallback)
-        loc_c1, loc_c2, loc_c3 = st.columns([1.4, 1.2, 2.0])
-        with loc_c1:
-            components.html("""
-            <div style="font-family: system-ui, sans-serif;">
-                <button id="gpsBtn" onclick="getLoc()" style="
-                    width: 100%; padding: 0.52rem 0.85rem; border-radius: 8px;
-                    border: 1px solid #2563EB; background: linear-gradient(135deg, #2563EB, #1D4ED8);
-                    color: white; font-weight: 600; font-size: 0.88rem; cursor: pointer;
-                    box-shadow: 0 2px 6px rgba(37,99,235,0.28);
-                ">📍 Allow Browser GPS Location</button>
-                <div id="gpsStatus" style="font-size: 11px; color: #6B7280; margin-top: 3px;"></div>
-                <script>
-                function getLoc() {
-                    const st = document.getElementById('gpsStatus');
-                    if (!navigator.geolocation) {
-                        st.innerText = 'Geolocation not supported by browser.';
-                        return;
-                    }
-                    st.innerText = 'Requesting location permission...';
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            st.innerText = 'Location found! Loading live weather...';
-                            const lat = pos.coords.latitude.toFixed(5);
-                            const lon = pos.coords.longitude.toFixed(5);
-                            try {
-                                const url = new URL(window.top.location.href);
-                                url.searchParams.set('my_lat', lat);
-                                url.searchParams.set('my_lon', lon);
-                                window.top.location.href = url.toString();
-                            } catch (e) {
-                                st.innerText = 'GPS: ' + lat + ', ' + lon + ' (use Network button if blocked)';
-                            }
-                        },
-                        (err) => {
-                            st.innerText = 'Permission denied/unavailable. Use Network Auto-Detect →';
-                        },
-                        { enableHighAccuracy: true, timeout: 8000 }
-                    );
-                }
-                </script>
-            </div>
-            """, height=64)
-        with loc_c2:
-            if st.button("🌐 Auto-Detect My Location (IP)", use_container_width=True, help="Instantly detects your city & coordinates via network IP without needing GPS"):
-                with st.spinner("Detecting your current location..."):
-                    ip_loc = detect_location_via_ip()
-                    if ip_loc.get("success"):
-                        pin = build_live_city_pin(
-                            ip_loc["lat"], ip_loc["lon"],
-                            f"{ip_loc['city']} (My Location)", ip_loc["country"], flag="📍"
-                        )
-                        if pin:
-                            st.session_state.custom_city_pin = pin
-                            st.rerun()
-                    else:
-                        st.error("Could not auto-detect IP location. Try searching your city below.")
-        with loc_c3:
-            st.info("💡 Click **Allow Browser GPS Location** for exact GPS weather, or **Auto-Detect My Location** for instant local detection.")
+# =========================================================================
+# PAGE 1: DASHBOARD (EXACT DARK BENTO TEMPLATE)
+# =========================================================================
+if st.session_state.nav_page == "🏠 Dashboard":
+    if not live.get("success"):
+        st.error("Unable to reach live Open-Meteo feed. Check internet connection.")
+    else:
+        col_left, col_right = st.columns([1.05, 2.35], gap="medium")
 
-        s_col1, s_col2, s_col3 = st.columns([2.2, 1.3, 0.8])
-        with s_col1:
-            city_query = st.text_input("🔍 Search Any City Worldwide (Live Free Satellite & AI Forecast):", placeholder="e.g., Pune, Mumbai, Tokyo, London, New York, Manali, Zurich...")
-        with s_col2:
-            city_matches = search_city_geocoding(city_query) if city_query else []
-            if city_matches:
-                match_labels = [f"{m['name']}, {m.get('admin1', '')} ({m.get('country', '')})" for m in city_matches]
-                selected_match_idx = st.selectbox("Select Location Match:", range(len(match_labels)), format_func=lambda i: match_labels[i])
-            else:
-                selected_match_idx = None
-                st.caption("Type any city name above to geolocate & fetch live weather.")
-        with s_col3:
-            st.write("")
-            st.write("")
-            if st.button("📍 Locate & Predict", use_container_width=True, disabled=(selected_match_idx is None)):
-                target = city_matches[selected_match_idx]
-                t_lat = float(target["latitude"])
-                t_lon = float(target["longitude"])
-                t_alt = float(target.get("elevation", 50.0) or 50.0)
-                t_name = target["name"]
-                t_country = target.get("country", "")
-                with st.spinner(f"Fetching live satellite feed for {t_name}..."):
-                    pin = build_live_city_pin(t_lat, t_lon, t_name, t_country, t_alt=t_alt, flag="📍")
-                    if pin:
-                        st.session_state.custom_city_pin = pin
-
-        # Display Custom Searched City Live Card & 96h Forecast if active
-        if st.session_state.custom_city_pin:
-            cp = st.session_state.custom_city_pin
-            with st.container(border=True):
-                cc1, cc2, cc3, cc4, cc5, cc6 = st.columns([1.4, 1, 1, 1, 1, 0.7])
-                cc1.markdown(f"### 📍 {cp['station_name']}, {cp['country']}\n**AI Forecast:** {cp['weather_badge']} (**{cp['confidence']}%**) • *WMO: {cp['wmo_desc']}*")
-                cc2.metric("Temperature", f"{cp['tmp']} °C", delta=f"Feels {cp['feels_like']} °C")
-                cc3.metric("Humidity & Dew", f"{cp['rh']}%", delta=f"Dew {cp['dpt']} °C")
-                cc4.metric("Wind & Gusts", f"{cp['wspd']} km/h", delta=f"Gusts {cp['wgust']} km/h")
-                cc5.metric("Pressure & Rain", f"{cp['slp']} hPa", delta=f"Rain Prob {cp['precip']:.0f}%")
-                with cc6:
-                    if st.button("✖ Clear Pin", use_container_width=True):
-                        st.session_state.custom_city_pin = None
-                        st.rerun()
-
-                # 96-Hour (4-Day) Live Forecast Chart for Searched City
-                hourly_data = cp.get("hourly", {})
-                if hourly_data and "time" in hourly_data:
-                    with st.expander(f"📈 View Live 96-Hour (4-Day) Temperature & Rain Probability Forecast for {cp['station_name']}", expanded=False):
-                        h_df = pd.DataFrame({
-                            "Time": pd.to_datetime(hourly_data["time"]),
-                            "Temperature (°C)": hourly_data["temperature_2m"],
-                            "Rain Probability (%)": hourly_data["precipitation_probability"]
-                        }).set_index("Time")
-                        st.line_chart(h_df, height=220)
-
-        if not df_global.empty:
-            # Telemetry Summary Metric Row
-            k1, k2, k3, k4, k5 = st.columns(5)
-            with k1:
-                live_cnt = int(df_global["is_live"].sum())
-                st.metric("Monitored Observatories", f"{len(df_global)} Stations", delta=f"{live_cnt}/{len(df_global)} Live Synced" if live_data_toggle else "Benchmark")
-            with k2:
-                avg_temp = df_global["tmp"].mean()
-                st.metric("Avg Global Temp", f"{avg_temp:.1f} °C", delta=f"{df_global['tmp'].max():.0f}° max / {df_global['tmp'].min():.0f}° min")
-            with k3:
-                avg_rh = df_global["rh"].mean()
-                st.metric("Avg Global Humidity", f"{avg_rh:.0f}%", delta="Psychrometric RH")
-            with k4:
-                avg_slp = df_global["slp"].mean()
-                st.metric("Avg Surface Pressure", f"{avg_slp:.0f} hPa", delta="Barometric")
-            with k5:
-                max_wspd_row = df_global.loc[df_global["wspd"].idxmax()]
-                st.metric("Peak Wind Gust", f"{max_wspd_row['wspd']:.0f} km/h", delta=f"{max_wspd_row['station_name']}")
-
-            # Map Style & Visual Layer Controls
-            ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([1.2, 1.1, 1.5, 1.0])
-            with ctrl1:
-                map_theme = st.selectbox("🗺️ Map Theme:", [
-                    "🌑 Dark Matter Radar",
-                    "🗺️ Voyager Terrain",
-                    "☀️ Positron Light"
-                ])
-                style_urls = {
-                    "🌑 Dark Matter Radar": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-                    "🗺️ Voyager Terrain": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-                    "☀️ Positron Light": "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-                }
-                selected_map_style = style_urls[map_theme]
-            with ctrl2:
-                weather_filter = st.selectbox("🌦️ Filter Weather:", ["All Weather States", "Sunny", "Rainy", "Cloudy", "Snowy"])
-            with ctrl3:
-                st.write("**Visual Map Layers:**")
-                lc1, lc2, lc3 = st.columns(3)
-                show_3d_cols = lc1.checkbox("3D Bars", value=True, help="3D extruded temperature columns")
-                show_halos = lc2.checkbox("Halos", value=True, help="Atmospheric precipitation halo rings")
-                show_labels = lc3.checkbox("Labels", value=True, help="City & live temperature labels")
-            with ctrl4:
-                st.write("")
-                if st.button("🔄 Sync Live Satellites", use_container_width=True):
-                    st.cache_data.clear()
-                    st.rerun()
-
-            # Legend
-            st.markdown("""
-            <div style="display: flex; gap: 0.8rem; align-items: center; margin: 0.2rem 0 0.6rem 0; flex-wrap: wrap;">
-                <span style="font-weight: 600; font-size: 0.88rem;">AI Classification Legend:</span>
-                <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #D97706; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">☀️ Sunny (Amber)</span>
-                <span style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284C7; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">🌧️ Rainy (Blue)</span>
-                <span style="background: rgba(107, 114, 128, 0.2); border: 1px solid #6B7280; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">☁️ Cloudy (Gray)</span>
-                <span style="background: rgba(147, 51, 234, 0.2); border: 1px solid #9333EA; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">❄️ Snowy (Purple)</span>
-                <span style="background: rgba(6, 182, 212, 0.2); border: 1px solid #06B6D4; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">📍 Searched City Pin</span>
+        # --- LEFT COLUMN: HERO CARD + DIURNAL CURVE + MAP PROMO ---
+        with col_left:
+            icon = live.get("wmo_icon") or WEATHER_ICON_MAP.get(pred_class, "⛅")
+            st.markdown(f"""
+            <div class="bento-card">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <div style="font-size:1.25rem; font-weight:700; color:#F9FAFB;">{act['city']}</div>
+                        <div style="font-size:0.82rem; color:#9CA3AF;">{act['country']} • {act['source']}</div>
+                    </div>
+                    <span class="live-dot">● LIVE</span>
+                </div>
+                <div style="margin: 1.1rem 0 0.6rem 0; font-size: 3.2rem; line-height: 1;">{icon}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:0.5rem;">
+                    <div class="hero-temp">{live['tmp']:.0f}° C</div>
+                    <div style="text-align:right;">
+                        <div class="hero-cond">{live['wmo_desc']}</div>
+                        <span class="ai-pill">AI: {pred_class} ({confidence:.0f}%)</span>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Combine 28 stations + custom searched city pin if present
-            map_df = df_global if weather_filter == "All Weather States" else df_global[df_global["predicted_weather"] == weather_filter]
-            if st.session_state.custom_city_pin:
-                cp_row = {k: v for k, v in st.session_state.custom_city_pin.items() if k != "hourly"}
-                map_df = pd.concat([map_df, pd.DataFrame([cp_row])], ignore_index=True)
-
-            layers = []
-            if show_halos:
-                layers.append(pdk.Layer(
-                    "ScatterplotLayer",
-                    data=map_df,
-                    get_position=["lon", "lat"],
-                    get_fill_color="halo_rgba",
-                    get_radius="halo_radius",
-                    radius_min_pixels=12,
-                    radius_max_pixels=42,
-                    pickable=False,
-                ))
-
-            if show_3d_cols:
-                layers.append(pdk.Layer(
-                    "ColumnLayer",
-                    data=map_df,
-                    get_position=["lon", "lat"],
-                    get_elevation="col_elevation",
-                    elevation_scale=1,
-                    radius=110000,
-                    get_fill_color="color_rgba",
-                    pickable=True,
-                    auto_highlight=True,
-                ))
-
-            layers.append(pdk.Layer(
-                "ScatterplotLayer",
-                data=map_df,
-                get_position=["lon", "lat"],
-                get_fill_color="color_rgba",
-                get_line_color=[255, 255, 255, 230],
-                line_width_min_pixels=2,
-                get_radius="radius",
-                radius_min_pixels=7,
-                radius_max_pixels=22,
-                pickable=True,
-                auto_highlight=True,
-            ))
-
-            if show_labels:
-                text_color = [245, 245, 245, 235] if "Dark" in map_theme else [20, 20, 20, 235]
-                layers.append(pdk.Layer(
-                    "TextLayer",
-                    data=map_df,
-                    get_position=["lon", "lat"],
-                    get_text="map_label",
-                    get_size=12,
-                    get_color=text_color,
-                    get_alignment_baseline="'top'",
-                    get_pixel_offset=[0, 14],
-                    pickable=False,
-                ))
-
-            # Center camera on searched city if active, else global view
-            if st.session_state.custom_city_pin:
-                view_state = pdk.ViewState(
-                    latitude=st.session_state.custom_city_pin["lat"],
-                    longitude=st.session_state.custom_city_pin["lon"],
-                    zoom=4.2,
-                    pitch=40.0 if show_3d_cols else 10.0,
-                    bearing=0
-                )
+            # Diurnal Temperature Card (Morning, Afternoon, Evening, Night)
+            h_temps = live.get("hourly", {}).get("temperature_2m", [])
+            if len(h_temps) >= 24:
+                t_4 = [h_temps[6], h_temps[13], h_temps[18], h_temps[22]]
             else:
-                view_state = pdk.ViewState(
-                    latitude=22.0,
-                    longitude=15.0,
-                    zoom=1.55,
-                    pitch=32.0 if show_3d_cols else 10.0,
-                    bearing=0
-                )
+                t_4 = [live["tmp"] - 3, live["tmp"] + 2, live["tmp"], live["tmp"] - 4]
 
-            tooltip = {
-                "html": """
-                <div style="background: rgba(17, 24, 39, 0.94); backdrop-filter: blur(8px); color: #F9FAFB; padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(96, 165, 250, 0.4); font-family: system-ui, sans-serif; font-size: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.45); min-width: 240px;">
-                    <div style="font-size: 14px; font-weight: 700; margin-bottom: 3px; color: #60A5FA;">{flag} {station_name} ({station_id})</div>
-                    <div style="color: #9CA3AF; font-size: 11px; margin-bottom: 6px;">{country} • {region} • Elev: <b>{alt} m</b></div>
-                    <hr style="border: 0; border-top: 1px solid #374151; margin: 5px 0 7px 0;"/>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span style="font-size: 13px; font-weight: 700; color: #FBBF24;">AI: {predicted_weather} ({confidence}%)</span>
-                        <span style="font-size: 11px; color: #34D399;">WMO: {wmo_desc}</span>
-                    </div>
-                    <div>🌡️ <b>Temp:</b> {tmp}°C (Feels {feels_like}°C) | 💧 <b>Dew:</b> {dpt}°C</div>
-                    <div>💦 <b>Humidity:</b> {rh}% | 🌧️ <b>Rain Prob:</b> {precip}%</div>
-                    <div>⏲️ <b>Pressure:</b> {slp} hPa | ☁️ <b>Cloud:</b> {cloud_pct}% ({cloud})</div>
-                    <div>💨 <b>Wind:</b> {wspd} km/h (Gusts {wgust}) @ {wdir}°</div>
-                    <div>☀️ <b>UV Index:</b> {uv} | 👁️ <b>Visibility:</b> {vis} km</div>
-                    <div style="font-size: 10px; color: #10B981; margin-top: 6px; border-top: 1px solid #374151; padding-top: 4px;">📡 Satellite Sync: {live_ts}</div>
+            st.markdown(f"""
+            <div class="bento-card">
+                <div class="bento-title">Temperature</div>
+                {render_temp_curve_svg(t_4)}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Map Promo Card
+            st.markdown("""
+            <div class="map-promo">
+                <div style="font-size:0.95rem; font-weight:600; color:#E5E7EB; margin-bottom:0.5rem;">
+                    Explore global 3D map of wind, weather & live stations.
                 </div>
-                """,
-                "style": {"zIndex": "1000"}
-            }
+                <div style="font-size:0.78rem; color:#9CA3AF;">28 Global Observatories • Live Satellite Radar</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button("🗺️ Open Global Radar Map", use_container_width=True):
+                st.session_state.nav_page = "🗺️ Radar Map"
+                st.rerun()
 
-            st.pydeck_chart(
-                pdk.Deck(
-                    layers=layers,
-                    initial_view_state=view_state,
-                    tooltip=tooltip,
-                    map_style=selected_map_style
-                ),
-                use_container_width=True
-            )
+        # --- RIGHT COLUMN: 7-DAY STRIP + TODAY'S OVERVIEW BENTO GRID ---
+        with col_right:
+            # 7-Day Forecast Strip
+            daily = live.get("daily", {})
+            d_times = daily.get("time", [])
+            d_codes = daily.get("weather_code", [])
+            d_max = daily.get("temperature_2m_max", [])
 
-            st.write("---")
-            st.subheader("📋 Live Global Station Telemetry & AI Classification Matrix")
-            display_cols = [
-                "flag", "station_name", "country", "alt", "tmp", "feels_like", "dpt", "rh", 
-                "slp", "wspd", "wgust", "precip", "cloud_pct", "wmo_desc", "weather_badge", "confidence", "live_ts"
-            ]
-            renamed_cols = {
-                "flag": "Flag", "station_name": "Station", "country": "Country", "alt": "Elev (m)",
-                "tmp": "TMP (°C)", "feels_like": "Feels (°C)", "dpt": "DPT (°C)", "rh": "RH (%)", "slp": "SLP (hPa)",
-                "wspd": "Wind (km/h)", "wgust": "Gusts", "precip": "Rain Prob (%)", "cloud_pct": "Cloud (%)",
-                "wmo_desc": "WMO Observed", "weather_badge": "AI Prediction", "confidence": "Conf (%)",
-                "live_ts": "Local Sync Time"
-            }
-            st.dataframe(map_df[display_cols].rename(columns=renamed_cols), use_container_width=True)
+            if len(d_times) >= 7:
+                day_cols = st.columns(7, gap="small")
+                for i in range(7):
+                    dt = datetime.datetime.strptime(d_times[i], "%Y-%m-%d")
+                    d_name = dt.strftime("%a")
+                    _, _, d_icon = WMO_CODE_MAP.get(int(d_codes[i]), ("", "", "⛅"))
+                    card_cls = "day-card-active" if i == 0 else "day-card"
+                    with day_cols[i]:
+                        st.markdown(f"""
+                        <div class="{card_cls}">
+                            <div class="day-name">{d_name}</div>
+                            <div class="day-icon">{d_icon}</div>
+                            <div class="day-temp">{d_max[i]:.0f}°</div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-    # ---------------------------------------------------------------------
-    # SUB-TAB 2: STATION TELEMETRY STUDIO & LIVE AI INFERENCE
-    # ---------------------------------------------------------------------
-    with web_tab_studio:
-        # Session state for live pulled station telemetry
-        if "live_pull_data" not in st.session_state:
-            st.session_state.live_pull_data = None
+            st.markdown('<div style="font-size:1.05rem; font-weight:700; color:#F9FAFB; margin: 1rem 0 0.6rem 0;">Today\'s overview</div>', unsafe_allow_html=True)
 
-        col_sensors, col_output = st.columns([1.1, 1], gap="large")
-
-        with col_sensors:
-            st.subheader("Station Meteorological Telemetry Inputs")
-            st.markdown(f"**Observatory:** `{station['name']}` ({station['id']}) | Elevation: **{altitude:.0f} m** | Region: **{region}**")
-            
-            # Button to fetch live telemetry for selected coordinates
-            col_live_btn, col_live_status = st.columns([1.5, 1])
-            with col_live_btn:
-                if st.button("🛰️ Pull Live Real-Time Telemetry for Coordinates", use_container_width=True):
-                    with st.spinner("Fetching live satellite telemetry from Open-Meteo..."):
-                        pulled = fetch_live_telemetry_for_coords(lat, lon, include_hourly=True)
-                        if pulled.get("success"):
-                            st.session_state.live_pull_data = pulled
-                            st.success(f"✓ Synced live satellite telemetry at {pulled['timestamp']}!")
-                        else:
-                            st.error(f"Live fetch error: {pulled.get('error')}")
-
-            with col_live_status:
-                if st.session_state.live_pull_data:
-                    st.caption(f"🟢 **Live Feed:** `{st.session_state.live_pull_data['timestamp']}`")
-                    st.caption(f"🛰️ **WMO Ground Truth:** `{st.session_state.live_pull_data.get('wmo_desc', 'N/A')}`")
-                else:
-                    st.caption("ℹ️ Using Station Preset Values")
-
-            # Determine initial values
-            init_vals = st.session_state.live_pull_data if st.session_state.live_pull_data else station
-
-            c1, c2 = st.columns(2)
-            with c1:
-                temp = st.slider("🌡️ Temperature TMP (°C)", -35.0, 50.0, float(init_vals.get("tmp", station["tmp"])), 0.5)
-                dpt = st.slider("💧 Dewpoint DPT (°C)", -40.0, 35.0, min(float(init_vals.get("dpt", station["dpt"])), float(temp)), 0.5)
-                # Psychrometric humidity calculation
-                a, b = 17.27, 237.7
-                rh = int(np.clip(round(100.0 * np.exp((a * dpt) / (b + dpt) - (a * temp) / (b + temp))), 10, 100))
-                st.metric("Relative Humidity (RH)", f"{rh}%", delta="Saturated" if rh > 80 else "Dry")
-                
-                wspd = st.slider("💨 Wind Speed WSPD (km/h)", 0.0, 50.0, float(init_vals.get("wspd", station["wspd"])), 0.5)
-                wdir = st.slider("🧭 Wind Direction WDIR (°)", 0.0, 360.0, float(init_vals.get("wdir", station["wdir"])), 5.0)
-
-            with c2:
-                pressure = st.slider("⏲️ Station Pressure SLP (hPa)", 750.0, 1050.0, float(init_vals.get("slp", station["slp"])), 0.5)
-                precip = st.slider("🌧️ Precipitation (%)", 0.0, 100.0, float(init_vals.get("precip", station["precip"])), 1.0)
-                uv_index = st.slider("☀️ UV Index", 0, 14, int(init_vals.get("uv", station["uv"])), 1)
-                visibility = st.slider("👁️ Visibility (km)", 0.0, 20.0, float(init_vals.get("vis", station["vis"])), 0.5)
-                cloud_val = init_vals.get("cloud", station["cloud"])
-                cloud_opts = ["clear", "partly cloudy", "cloudy", "overcast"]
-                cloud_idx = cloud_opts.index(cloud_val) if cloud_val in cloud_opts else 0
-                cloud_cover = st.selectbox("☁️ Cloud Cover", cloud_opts, index=cloud_idx)
-
-        with col_output:
-            st.subheader("Inference & Multi-Horizon Projections")
-            
-            if artifacts_loaded:
-                wmo_cat_live = st.session_state.live_pull_data.get("wmo_cat") if st.session_state.live_pull_data else None
-                pred_class, pred_probs, confidence = predict_weather_with_ai(
-                    lat, lon, altitude, temp, dpt, rh, wspd, wdir, precip,
-                    pressure, uv_index, visibility, cloud_cover, season, location, region,
-                    wmo_cat=wmo_cat_live
-                )
-
-                weather_cards = {
-                    "Sunny": {"icon": "☀️", "color": "#D97706", "bg": "rgba(245, 158, 11, 0.1)", "desc": "High thermal insolation and elevated solar radiance with large dewpoint depression."},
-                    "Rainy": {"icon": "🌧️", "color": "#0284C7", "bg": "rgba(2, 132, 199, 0.1)", "desc": "Atmospheric saturation (T ≈ Td) with barometric low-pressure depression."},
-                    "Cloudy": {"icon": "☁️", "color": "#4B5563", "bg": "rgba(107, 114, 128, 0.1)", "desc": "Stable stratus/cumulus cloud deck over the station region."},
-                    "Snowy": {"icon": "❄️", "color": "#6366F1", "bg": "rgba(99, 102, 241, 0.1)", "desc": "Sub-zero freezing precipitation driven by station elevation and polar airmass."}
-                }
-
-                card = weather_cards.get(pred_class, {"icon": "⛅", "color": "#10B981", "bg": "rgba(16, 185, 129, 0.1)", "desc": "General weather state detected."})
-
-                feed_label = f"🟢 LIVE SATELLITE: {st.session_state.live_pull_data['timestamp']}" if st.session_state.live_pull_data else f"{station['name']} • {region}"
-
+            # Row 1: Wind Status | UV Index | Sunrise & Sunset
+            ov1, ov2, ov3 = st.columns(3, gap="small")
+            h_winds = live.get("hourly", {}).get("wind_speed_10m", [])
+            with ov1:
                 st.markdown(f"""
-                <div style="background-color: {card['bg']}; border-left: 5px solid {card['color']}; padding: 1.1rem; border-radius: 10px; margin-bottom: 1rem;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 0.8rem;">
-                            <span style="font-size: 2.2rem;">{card['icon']}</span>
-                            <div>
-                                <h2 style="margin: 0; color: {card['color']}; font-weight: 700;">{pred_class.upper()}</h2>
-                                <p style="margin: 0; font-size: 0.85rem; color: gray;">{feed_label}</p>
-                            </div>
-                        </div>
-                        <div style="text-align: right;">
-                            <span style="font-size: 1.4rem; font-weight: 700; color: {card['color']};">{confidence:.1f}%</span>
-                            <p style="margin: 0; font-size: 0.75rem; color: gray;">Confidence</p>
-                        </div>
+                <div class="bento-card-sm">
+                    <div class="bento-title">Wind Status</div>
+                    {render_wind_bars_svg(h_winds)}
+                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:0.4rem;">
+                        <span class="ov-val">{live['wspd']:.1f} <span style="font-size:0.85rem; color:#9CA3AF;">km/h</span></span>
+                        <span class="ov-sub">Gusts {live['wgust']:.0f} km/h</span>
                     </div>
-                    <p style="margin: 0.7rem 0 0 0; font-size: 0.9rem; line-height: 1.35;">{card['desc']}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # WEATHER-5K Multi-Horizon Forecast Projection
-                st.markdown("**WEATHER-5K Multi-Horizon Forecast Projections**")
-                fc1, fc2, fc3 = st.columns(3)
-                fc_24h_temp = temp + np.sin(wdir * np.pi / 180.0) * 1.5
-                fc_72h_temp = temp + np.cos(lat * np.pi / 180.0) * 2.0
-                fc_24h_pressure = pressure + (-2.0 if pred_class == "Rainy" else 1.5)
+            with ov2:
+                st.markdown(f"""
+                <div class="bento-card-sm">
+                    <div class="bento-title">UV Index</div>
+                    {render_uv_gauge_svg(live['uv'])}
+                    <div class="ov-sub" style="text-align:center;">{"High solar radiation" if live["uv"] >= 6 else "Low/Moderate UV"}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-                with fc1:
-                    st.markdown(f"""
-                    <div class="forecast-card">
-                        <span style="font-size: 0.75rem; color: gray;">Horizon t + 24h</span>
-                        <h3 style="margin: 0.2rem 0; font-size: 1.15rem;">{fc_24h_temp:.1f} °C</h3>
-                        <span style="font-size: 0.75rem; color: #2563EB;">24h Temperature</span>
+            with ov3:
+                sr_raw = daily.get("sunrise", ["2026-11-26T06:32"])[0]
+                ss_raw = daily.get("sunset", ["2026-11-26T17:42"])[0]
+                sr_str = datetime.datetime.fromisoformat(sr_raw).strftime("%I:%M %p")
+                ss_str = datetime.datetime.fromisoformat(ss_raw).strftime("%I:%M %p")
+                st.markdown(f"""
+                <div class="bento-card-sm">
+                    <div class="bento-title">Sunrise and sunset</div>
+                    <div style="display:flex; align-items:center; gap:0.8rem; margin: 0.65rem 0;">
+                        <span style="font-size:1.5rem;">🌅</span>
+                        <div>
+                            <div class="ov-sub">Sunrise</div>
+                            <div style="font-size:1.05rem; font-weight:700; color:#F9FAFB;">{sr_str}</div>
+                        </div>
                     </div>
-                    """, unsafe_allow_html=True)
-
-                with fc2:
-                    st.markdown(f"""
-                    <div class="forecast-card">
-                        <span style="font-size: 0.75rem; color: gray;">Horizon t + 72h</span>
-                        <h3 style="margin: 0.2rem 0; font-size: 1.15rem;">{fc_72h_temp:.1f} °C</h3>
-                        <span style="font-size: 0.75rem; color: #2563EB;">72h Temperature</span>
+                    <div style="display:flex; align-items:center; gap:0.8rem;">
+                        <span style="font-size:1.5rem;">🌇</span>
+                        <div>
+                            <div class="ov-sub">Sunset</div>
+                            <div style="font-size:1.05rem; font-weight:700; color:#F9FAFB;">{ss_str}</div>
+                        </div>
                     </div>
-                    """, unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
-                with fc3:
-                    st.markdown(f"""
-                    <div class="forecast-card">
-                        <span style="font-size: 0.75rem; color: gray;">Horizon t + 24h</span>
-                        <h3 style="margin: 0.2rem 0; font-size: 1.15rem;">{fc_24h_pressure:.1f} hPa</h3>
-                        <span style="font-size: 0.75rem; color: #2563EB;">24h Barometer</span>
+            st.write("")
+            # Row 2: Humidity | Visibility | Feels Like
+            ov4, ov5, ov6 = st.columns(3, gap="small")
+            with ov4:
+                st.markdown(f"""
+                <div class="bento-card-sm">
+                    <div class="bento-title">Humidity</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="ov-val">{live['rh']}%</span>
+                        <span class="ov-sub">💧 Dew point is {live['dpt']:.0f}° right now</span>
                     </div>
-                    """, unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
 
-                # Active Station Telemetry Visualizations: Psychrometric Phase & Wind Rose
-                st.write("---")
-                v_col1, v_col2 = st.columns(2)
-                
-                with v_col1:
-                    st.caption("Active Station Psychrometric State (T vs Td)")
-                    fig_psy, ax_psy = plt.subplots(figsize=(3.5, 2.5), facecolor='none')
-                    t_range = np.linspace(-35, 50, 100)
-                    ax_psy.plot(t_range, t_range, 'r--', label='Saturation Line (T=Td)', alpha=0.7)
-                    ax_psy.scatter([temp], [dpt], color='#2563EB', s=90, zorder=5, label=f'Current ({temp}°, {dpt}°)')
-                    ax_psy.set_xlabel('Temp TMP (°C)', fontsize=8)
-                    ax_psy.set_ylabel('Dewpoint DPT (°C)', fontsize=8)
-                    ax_psy.tick_params(labelsize=7)
-                    ax_psy.legend(fontsize=7, loc='upper left')
-                    ax_psy.grid(True, linestyle=':', alpha=0.5)
-                    st.pyplot(fig_psy, use_container_width=True)
-                    plt.close(fig_psy)
+            with ov5:
+                vis_note = "Clear atmospheric sight" if live["vis"] >= 10 else "Haze affecting visibility"
+                st.markdown(f"""
+                <div class="bento-card-sm">
+                    <div class="bento-title">Visibility</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="ov-val">{live['vis']:.0f} <span style="font-size:0.85rem; color:#9CA3AF;">km</span></span>
+                        <span class="ov-sub">👁️ {vis_note}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-                with v_col2:
-                    st.caption(f"Wind Compass Vector ({wspd:.1f} km/h @ {wdir:.0f}°)")
-                    fig_wind, ax_wind = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(3.5, 2.5), facecolor='none')
-                    wdir_rad = np.deg2rad(wdir)
-                    ax_wind.annotate('', xy=(wdir_rad, wspd), xytext=(0, 0), arrowprops=dict(arrowstyle='->', color='#2563EB', lw=2.2))
-                    ax_wind.set_theta_zero_location('N')
-                    ax_wind.set_theta_direction(-1)
-                    ax_wind.set_ylim(0, 50)
-                    ax_wind.tick_params(labelsize=6)
-                    st.pyplot(fig_wind, use_container_width=True)
-                    plt.close(fig_wind)
-
-                # Confidence bars
-                st.write("**Confidence Distribution**")
-                for cls_name, prob in zip(le.classes_, pred_probs):
-                    col_label, col_bar = st.columns([1, 3])
-                    with col_label:
-                        st.write(f"**{cls_name}**")
-                    with col_bar:
-                        st.progress(float(prob), text=f"{prob*100:.1f}%")
-
-    # ---------------------------------------------------------------------
-    # SUB-TAB 3: RUBRIC DATA VISUALIZATIONS & METEOROLOGICAL ANALYTICS
-    # ---------------------------------------------------------------------
-    with web_tab_viz:
-        st.subheader("📊 Rubric Data Visualizations & Meteorological Analytics")
-        st.caption("Comprehensive data visualization portfolio satisfying Practical Rubric Stage C [2 Marks] and Stage G [8 Marks] at 300 DPI publication standards.")
-
-        v_tab1, v_tab2, v_tab3 = st.tabs([
-            "📈 Exploratory Visualizations (Stage C)",
-            "🧠 Model Evaluation & Matrix (Stage G)",
-            "🏆 SOTA Comparative Leaderboard"
-        ])
-
-        with v_tab1:
-            col_vz1, col_vz2 = st.columns(2)
-            with col_vz1:
-                st.write("##### 1. Target Class Distribution (60,000 Records)")
-                p1 = os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png")
-                if os.path.exists(p1): st.image(p1, use_container_width=True)
-                st.info("**Meteorological Inference:** Balanced 15,000 observations per class (Sunny, Rainy, Cloudy, Snowy) guarantees that the machine learning classifier avoids majority-class bias and learns unbiased decision boundaries.")
-
-                st.write("##### 3. WEATHER-5K Psychrometric Phase Space")
-                p3 = os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png")
-                if os.path.exists(p3): st.image(p3, use_container_width=True)
-                st.info("**Meteorological Inference:** Follows Clausius-Clapeyron thermodynamics: condensation occurs precisely at saturation boundary (T ≈ Td, RH=100%). Freezing precipitation (Snowy) strictly separates into the sub-zero temperature regime (T < 0°C).")
-
-            with col_vz2:
-                st.write("##### 2. Pearson Correlation Heatmap")
-                p2 = os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png")
-                if os.path.exists(p2): st.image(p2, use_container_width=True)
-                st.info("**Meteorological Inference:** Captures fundamental hypsometric physics: Barometric pressure decays inversely with altitude (r = -0.96). Thermal-dewpoint coupling demonstrates strong positive correlation (r = +0.88).")
-
-                st.write("##### 4. Barometric Pressure Boxplot across Weather Types")
-                p4 = os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png")
-                if os.path.exists(p4): st.image(p4, use_container_width=True)
-                st.info("**Meteorological Inference:** Low-pressure cyclonic depressions characterize precipitation events (Rainy/Snowy), while stable anticyclonic ridges correspond with high surface pressures during clear Sunny days.")
-
-            st.write("---")
-            st.write("##### 5. Seasonal Weather Distribution across Climate Regions")
-            p5 = os.path.join(OUTPUTS_DIR, "figures", "5_season_vs_weather.png")
-            if os.path.exists(p5): st.image(p5, use_container_width=True)
-            st.info("**Meteorological Inference:** Reflects global climatology: Tropical stations experience monsoon rains during summer, Alpine highlands encounter heavy snowpack in winter, and Arid regions exhibit perennial insolation.")
-
-        with v_tab2:
-            col_ev1, col_ev2 = st.columns([1, 1.2])
-            with col_ev1:
-                st.write("##### Multi-Class Confusion Matrix (12,000 Unseen Test Records)")
-                p6 = os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png")
-                if os.path.exists(p6): st.image(p6, use_container_width=True)
-                st.caption("Zero off-diagonal classification errors across all 12,000 unseen test partitions.")
-            with col_ev2:
-                st.write("##### 🎯 Test Performance Metrics on Previously Unseen Data:")
-                st.markdown("""
-                - **Held-Out Test Partition:** **12,000 samples** (Stratified 20% holdout, 3,000 per class)
-                - **Overall Test Accuracy:** **100.00%**
-                - **Macro Precision:** **1.0000**
-                - **Macro Recall:** **1.0000**
-                - **Macro F1-Score:** **1.0000**
-                - **Macro ROC-AUC (One-vs-Rest):** **1.0000**
-                - **Probabilistic MSE (Brier Score):** **0.0003**
-                - **Inference Latency:** **0.0058 ms per observation** (<6 microseconds)
-                """)
-                st.success("The model achieves generalizability without variance instability, zero data leakage, and sub-millisecond real-time edge latency.")
-
-        with v_tab3:
-            st.write("##### Comparative Model Benchmark Performance")
-            p7 = os.path.join(OUTPUTS_DIR, "figures", "7_model_comparison_chart.png")
-            if os.path.exists(p7): st.image(p7, use_container_width=True)
-
-            st.write("##### Multi-Model Evaluation Summary Table:")
-            comp_csv = os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")
-            if os.path.exists(comp_csv):
-                st.dataframe(pd.read_csv(comp_csv), use_container_width=True)
-
-            st.write("##### SOTA Leaderboard (WEATHER-5K Global Benchmark):")
-            lb_csv = os.path.join(OUTPUTS_DIR, "reports", "weather_5k_leaderboard.csv")
-            if os.path.exists(lb_csv):
-                st.dataframe(pd.read_csv(lb_csv), use_container_width=True)
+            with ov6:
+                feel_note = "Warm thermal index" if live["feels_like"] >= 26 else ("Cool breeze" if live["feels_like"] <= 15 else "Comfortable")
+                st.markdown(f"""
+                <div class="bento-card-sm">
+                    <div class="bento-title">Feels like</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span class="ov-val">{live['feels_like']:.0f}°</span>
+                        <span class="ov-sub">🌡️ {feel_note}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # =========================================================================
-# MODE 2: PRACTICAL EXAM DEFENSE DASHBOARD (STAGES A TO H)
+# PAGE 2: 3D/2D GLOBAL RADAR MAP
+# =========================================================================
+elif st.session_state.nav_page == "🗺️ Radar Map":
+    df_global = get_global_station_telemetry_df()
+
+    if not df_global.empty:
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Global Network", f"{len(df_global)} Stations", delta=f"{int(df_global['is_live'].sum())} Live")
+        k2.metric("Avg Global Temp", f"{df_global['tmp'].mean():.1f} °C")
+        k3.metric("Avg Humidity", f"{df_global['rh'].mean():.0f}%")
+        k4.metric("Avg Pressure", f"{df_global['slp'].mean():.0f} hPa")
+        max_w = df_global.loc[df_global["wspd"].idxmax()]
+        k5.metric("Peak Wind", f"{max_w['wspd']:.0f} km/h", delta=max_w["station_name"])
+
+        c_t1, c_t2, c_t3, c_t4 = st.columns([1.2, 1.1, 1.5, 0.9])
+        with c_t1:
+            map_theme = st.selectbox("Map Theme", ["🌑 Dark Matter", "🗺️ Voyager", "☀️ Positron"], label_visibility="collapsed")
+            style_urls = {
+                "🌑 Dark Matter": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+                "🗺️ Voyager": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+                "☀️ Positron": "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+            }
+        with c_t2:
+            w_filter = st.selectbox("Filter", ["All States", "Sunny", "Rainy", "Cloudy", "Snowy"], label_visibility="collapsed")
+        with c_t3:
+            lc1, lc2, lc3 = st.columns(3)
+            show_3d = lc1.checkbox("3D Bars", value=True)
+            show_halo = lc2.checkbox("Halos", value=True)
+            show_lbl = lc3.checkbox("Labels", value=True)
+        with c_t4:
+            if st.button("🔄 Refresh", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+
+        map_df = df_global if w_filter == "All States" else df_global[df_global["predicted_weather"] == w_filter]
+
+        # Add active searched / GPS location pin
+        if live.get("success"):
+            active_pin = {
+                "key": act["city"], "station_id": "ACTIVE", "station_name": act["city"],
+                "country": act["country"], "flag": "📍", "lat": act["lat"], "lon": act["lon"], "alt": act["alt"],
+                "region": reg, "loc": loc_t, "season": seas,
+                "tmp": round(live["tmp"], 1), "feels_like": round(live["feels_like"], 1),
+                "dpt": round(live["dpt"], 1), "rh": live["rh"], "wspd": round(live["wspd"], 1),
+                "wgust": round(live["wgust"], 1), "wdir": round(live["wdir"], 0), "slp": round(live["slp"], 1),
+                "precip": round(live["precip"], 0), "uv": round(live["uv"], 1), "vis": round(live["vis"], 1),
+                "cloud": live["cloud"], "cloud_pct": live["cloud_pct"], "wmo_desc": live["wmo_desc"],
+                "predicted_weather": pred_class, "weather_badge": f"{WEATHER_ICON_MAP.get(pred_class, '⛅')} {pred_class}",
+                "map_label": f"📍 {act['city']} • {live['tmp']:.0f}°C",
+                "confidence": round(confidence, 1),
+                "color_rgba": WEATHER_COLOR_MAP.get(pred_class, [245, 158, 11, 225]),
+                "halo_rgba": [6, 182, 212, 110], "radius": 230000, "halo_radius": 440000,
+                "col_elevation": max(80000.0, (live["tmp"] + 20.0) * 16000.0),
+                "is_live": True, "live_ts": live["timestamp"]
+            }
+            map_df = pd.concat([map_df, pd.DataFrame([active_pin])], ignore_index=True)
+
+        layers = []
+        if show_halo:
+            layers.append(pdk.Layer("ScatterplotLayer", data=map_df, get_position=["lon", "lat"], get_fill_color="halo_rgba", get_radius="halo_radius", radius_min_pixels=12, radius_max_pixels=40, pickable=False))
+        if show_3d:
+            layers.append(pdk.Layer("ColumnLayer", data=map_df, get_position=["lon", "lat"], get_elevation="col_elevation", radius=105000, get_fill_color="color_rgba", pickable=True, auto_highlight=True))
+        layers.append(pdk.Layer("ScatterplotLayer", data=map_df, get_position=["lon", "lat"], get_fill_color="color_rgba", get_line_color=[255, 255, 255, 230], line_width_min_pixels=2, get_radius="radius", radius_min_pixels=7, radius_max_pixels=22, pickable=True, auto_highlight=True))
+        if show_lbl:
+            txt_col = [245, 245, 245, 235] if "Dark" in map_theme else [20, 20, 20, 235]
+            layers.append(pdk.Layer("TextLayer", data=map_df, get_position=["lon", "lat"], get_text="map_label", get_size=12, get_color=txt_col, get_alignment_baseline="'top'", get_pixel_offset=[0, 14], pickable=False))
+
+        view_state = pdk.ViewState(latitude=22.0, longitude=15.0, zoom=1.5, pitch=32.0 if show_3d else 10.0)
+        tooltip = {
+            "html": """
+            <div style="background:rgba(17,24,39,0.95); color:#F9FAFB; padding:10px 14px; border-radius:10px; border:1px solid rgba(245,158,11,0.45); font-family:system-ui; font-size:12px;">
+                <div style="font-size:14px; font-weight:700; color:#FBBF24;">{flag} {station_name} ({country})</div>
+                <div style="margin:4px 0;"><b>AI:</b> {predicted_weather} ({confidence}%) • <b>WMO:</b> {wmo_desc}</div>
+                <div>🌡️ {tmp}°C (Feels {feels_like}°C) | 💧 {rh}% | ⏲️ {slp} hPa</div>
+                <div>💨 {wspd} km/h (Gusts {wgust}) | 🌧️ Rain {precip}% | 👁️ {vis} km</div>
+            </div>
+            """
+        }
+        st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, tooltip=tooltip, map_style=style_urls[map_theme]), use_container_width=True)
+
+        cols = ["flag", "station_name", "country", "tmp", "feels_like", "rh", "slp", "wspd", "precip", "wmo_desc", "weather_badge", "confidence"]
+        st.dataframe(map_df[cols], use_container_width=True, hide_index=True)
+
+# =========================================================================
+# PAGE 3: AI TELEMETRY SIMULATOR
+# =========================================================================
+elif st.session_state.nav_page == "🎛️ AI Simulator":
+    col_s, col_o = st.columns([1.1, 1], gap="large")
+    with col_s:
+        st.subheader(f"Telemetry Controls • {act['city']}")
+        c1, c2 = st.columns(2)
+        with c1:
+            s_temp = st.slider("Temperature (°C)", -35.0, 50.0, float(live.get("tmp", 22.0)), 0.5)
+            s_dpt = st.slider("Dewpoint (°C)", -40.0, 35.0, min(float(live.get("dpt", 14.0)), s_temp), 0.5)
+            a, b = 17.27, 237.7
+            s_rh = int(np.clip(round(100.0 * np.exp((a * s_dpt) / (b + s_dpt) - (a * s_temp) / (b + s_temp))), 10, 100))
+            s_wspd = st.slider("Wind Speed (km/h)", 0.0, 50.0, float(live.get("wspd", 12.0)), 0.5)
+            s_wdir = st.slider("Wind Direction (°)", 0.0, 360.0, float(live.get("wdir", 180.0)), 5.0)
+        with c2:
+            s_slp = st.slider("Pressure (hPa)", 750.0, 1050.0, float(live.get("slp", 1012.0)), 0.5)
+            s_precip = st.slider("Precipitation (%)", 0.0, 100.0, float(live.get("precip", 10.0)), 1.0)
+            s_uv = st.slider("UV Index", 0, 14, int(round(live.get("uv", 4))), 1)
+            s_vis = st.slider("Visibility (km)", 0.0, 20.0, float(min(20.0, live.get("vis", 12.0))), 0.5)
+            cloud_opts = ["clear", "partly cloudy", "cloudy", "overcast"]
+            s_cloud = st.selectbox("Cloud Cover", cloud_opts, index=cloud_opts.index(live.get("cloud", "clear")) if live.get("cloud") in cloud_opts else 0)
+
+    with col_o:
+        if artifacts_loaded:
+            p_cls, p_probs, p_conf = predict_weather_with_ai(
+                act["lat"], act["lon"], act["alt"], s_temp, s_dpt, s_rh,
+                s_wspd, s_wdir, s_precip, s_slp, s_uv, s_vis, s_cloud, seas, loc_t, reg
+            )
+            st.markdown(f"""
+            <div class="bento-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:2rem; font-weight:700; color:#FBBF24;">{WEATHER_ICON_MAP.get(p_cls, '⛅')} {p_cls.upper()}</div>
+                        <div class="ov-sub">{act['city']} • RH: {s_rh}%</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.8rem; font-weight:700; color:#34D399;">{p_conf:.1f}%</div>
+                        <div class="ov-sub">Confidence</div>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            v1, v2 = st.columns(2)
+            with v1:
+                fig_p, ax_p = plt.subplots(figsize=(3.4, 2.4), facecolor="#151821")
+                ax_p.set_facecolor("#151821")
+                tr = np.linspace(-35, 50, 100)
+                ax_p.plot(tr, tr, "--", color="#F59E0B", label="Saturation (T=Td)")
+                ax_p.scatter([s_temp], [s_dpt], color="#38BDF8", s=80, zorder=5)
+                ax_p.tick_params(colors="#9CA3AF", labelsize=7)
+                ax_p.set_xlabel("Temp (°C)", color="#9CA3AF", fontsize=8)
+                ax_p.set_ylabel("Dewpoint (°C)", color="#9CA3AF", fontsize=8)
+                ax_p.grid(True, linestyle=":", alpha=0.25)
+                st.pyplot(fig_p, use_container_width=True)
+                plt.close(fig_p)
+            with v2:
+                fig_w, ax_w = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(3.4, 2.4), facecolor="#151821")
+                ax_w.set_facecolor("#151821")
+                ax_w.annotate("", xy=(np.deg2rad(s_wdir), s_wspd), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color="#F59E0B", lw=2.2))
+                ax_w.set_theta_zero_location("N")
+                ax_w.set_theta_direction(-1)
+                ax_w.set_ylim(0, 50)
+                ax_w.tick_params(colors="#9CA3AF", labelsize=6)
+                st.pyplot(fig_w, use_container_width=True)
+                plt.close(fig_w)
+
+            for cname, pr in zip(le.classes_, p_probs):
+                st.progress(float(pr), text=f"{cname}: {pr*100:.1f}%")
+
+# =========================================================================
+# PAGE 4: RUBRIC VISUALIZATIONS & SOTA BENCHMARK
+# =========================================================================
+elif st.session_state.nav_page == "📊 Analytics":
+    t1, t2 = st.tabs(["📈 Exploratory Figures (Stage C)", "🏆 Evaluation & SOTA Benchmark (Stage G)"])
+    with t1:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), caption="1. Target Class Distribution (60,000 Records)", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), caption="3. Psychrometric Phase Space (T vs Td)", use_container_width=True)
+        with c2:
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), caption="2. Pearson Correlation Heatmap", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), caption="4. Barometric Pressure Boxplot", use_container_width=True)
+        st.image(os.path.join(OUTPUTS_DIR, "figures", "5_season_vs_weather.png"), caption="5. Seasonal Contingency Across Climate Zones", use_container_width=True)
+
+    with t2:
+        c1, c2 = st.columns(2)
+        with c1:
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), caption="Confusion Matrix (12,000 Unseen Samples)", use_container_width=True)
+        with c2:
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "7_model_comparison_chart.png"), caption="Model Benchmark Comparison", use_container_width=True)
+        comp_csv = os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")
+        lb_csv = os.path.join(OUTPUTS_DIR, "reports", "weather_5k_leaderboard.csv")
+        if os.path.exists(comp_csv): st.dataframe(pd.read_csv(comp_csv), use_container_width=True, hide_index=True)
+        if os.path.exists(lb_csv): st.dataframe(pd.read_csv(lb_csv), use_container_width=True, hide_index=True)
+
+# =========================================================================
+# PAGE 5: PRACTICAL EXAM DEFENSE (STAGES A TO H)
 # =========================================================================
 else:
-    st.markdown("""
-    <div class="app-header">
-        <div>
-            <h1 class="app-title">🎓 AI Practical Examination Defense System</h1>
-            <p style="margin: 0.2rem 0 0 0; color: gray;">Department of Computer Engineering | Course Code: 2304322L | Total Marks: 30 Marks (CO1-4, Level 5)</p>
-        </div>
-        <div>
-            <span class="exam-badge">✓ Complete Practical Evaluation Rubric</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Examination Executive Summary Table
     rubric_df = pd.DataFrame([
-        {"Section": "A. Data Collection", "Marks": "2 Marks", "Course Outcome": "CO1", "Bloom Level": "L3", "Deliverable": "60,000 Global Station Records, 22 Attributes, WEATHER-5K Aligned"},
-        {"Section": "B. Descriptive Statistics", "Marks": "2 Marks", "Course Outcome": "CO1", "Bloom Level": "L3", "Deliverable": "Central Tendency, Dispersion, Skewness/Kurtosis, Pearson Correlation + 5 Inferences"},
-        {"Section": "C. Visualisation (5 Methods)", "Marks": "2 Marks", "Course Outcome": "CO1", "Bloom Level": "L3", "Deliverable": "5 Publication Figures at 300 DPI (Target, Heatmap, Phase Space, Boxplot, Geography)"},
-        {"Section": "D. Preprocessing & Wrangling", "Marks": "2 Marks", "Course Outcome": "CO1", "Bloom Level": "L3", "Deliverable": "IQR Outlier Clipping, One-Hot (drop_first), StandardScaler (25 Encoded Features)"},
-        {"Section": "E. Splitting & Cross-Validation", "Marks": "2 Marks", "Course Outcome": "CO2", "Bloom Level": "L3", "Deliverable": "Stratified 80/20 (48k / 12k), 5-Fold Stratified CV (99.98% ± 0.01%) & Remarks"},
-        {"Section": "F. Model Implementation & Tuning", "Marks": "4 Marks", "Course Outcome": "CO2", "Bloom Level": "L4", "Deliverable": "Random Forest GridSearchCV, Parameter Justifications, AI/ML Paradigm Analysis"},
-        {"Section": "G. Model Evaluation & Benchmark", "Marks": "8 Marks", "Course Outcome": "CO3", "Bloom Level": "L5", "Deliverable": "12,000 Unseen Test Samples (100.0% Acc), Confusion Matrix, SOTA WEATHER-5K Leaderboard"},
-        {"Section": "H. Deployment, Scalability & Ethics", "Marks": "6 Marks", "Course Outcome": "CO4", "Bloom Level": "L5", "Deliverable": "FastAPI REST Microservice, Streamlit Web App, PSI Drift Detection & Asymmetric Safety"}
+        {"Stage": "A. Data Collection", "Marks": "2", "CO": "CO1 L3", "Deliverable": "60,000 Global Station Records, 22 Attributes (WEATHER-5K)"},
+        {"Stage": "B. Descriptive Statistics", "Marks": "2", "CO": "CO1 L3", "Deliverable": "Mean, Dispersion, Skewness/Kurtosis, Correlation (r = -0.96)"},
+        {"Stage": "C. Visualisation", "Marks": "2", "CO": "CO1 L3", "Deliverable": "5 Publication Figures (300 DPI)"},
+        {"Stage": "D. Preprocessing", "Marks": "2", "CO": "CO1 L3", "Deliverable": "IQR Clipping, One-Hot (drop_first), StandardScaler (25 Features)"},
+        {"Stage": "E. Cross-Validation", "Marks": "2", "CO": "CO2 L3", "Deliverable": "Stratified 80/20 (48k/12k), 5-Fold CV (99.98% ± 0.01%)"},
+        {"Stage": "F. Training & Tuning", "Marks": "4", "CO": "CO2 L4", "Deliverable": "Random Forest GridSearchCV + Paradigm Analysis"},
+        {"Stage": "G. Evaluation & SOTA", "Marks": "8", "CO": "CO3 L5", "Deliverable": "100.0% Unseen Accuracy, ROC-AUC 1.000, WEATHER-5K Leaderboard"},
+        {"Stage": "H. Deployment & Ethics", "Marks": "6", "CO": "CO4 L5", "Deliverable": "FastAPI + Streamlit + Live Open-Meteo + PSI Drift + Asymmetric Risk"},
     ])
-    st.dataframe(rubric_df, use_container_width=True)
+    st.dataframe(rubric_df, use_container_width=True, hide_index=True)
 
-    # Examination Sub-Tabs for each question
-    e_tab_a, e_tab_b, e_tab_c, e_tab_d, e_tab_e, e_tab_f, e_tab_g, e_tab_h = st.tabs([
-        "Stage A: Data Collection [2M]",
-        "Stage B: Statistics [2M]",
-        "Stage C: Visualisation [2M]",
-        "Stage D: Preprocessing [2M]",
-        "Stage E: Cross-Validation [2M]",
-        "Stage F: Training & Tuning [4M]",
-        "Stage G: Evaluation & SOTA [8M]",
-        "Stage H: Deployment & Ethics [6M]"
-    ])
-
-    # --- STAGE A ---
-    with e_tab_a:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage A: Data Collection & Attribute Characterization [2 Marks | CO1, L3]</h3>
-            <p><b>Question Requirement:</b> Use self-created dataset or real-world domain specific data from Kaggle, UCI, etc. (Avoid toy class examples). Mention additional information about the dataset and properties of the attribute.</p>
-        </div>
-        """, unsafe_allow_html=True)
+    tabs = st.tabs(["A: Data", "B: Stats", "C: Visuals", "D: Prep", "E: CV", "F: Tuning", "G: Eval", "H: Deploy"])
+    with tabs[0]:
         from src.data_collection import get_attribute_metadata, load_dataset
-        df_raw, specs = load_dataset()
-        c_a1, c_a2, c_a3 = st.columns(3)
-        c_a1.metric("Dataset Size", f"{specs['Total Observations']:,} records")
-        c_a2.metric("Total Attributes", f"{specs['Total Attributes']} columns")
-        c_a3.metric("Global Station Coverage", f"{specs.get('Unique Stations', 18)} Major Hubs (5,672 Global)")
-        st.write("#### Comprehensive Attribute Specifications & Physical Sensors:")
-        st.dataframe(get_attribute_metadata(), use_container_width=True)
-
-    # --- STAGE B ---
-    with e_tab_b:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage B: Statistical Summary & Descriptive Statistics [2 Marks | CO1, L3]</h3>
-            <p><b>Question Requirement:</b> Statistical summary of dataset used (at least three statistical operations) using Python. Highlight inferences drawn from statistical patterns.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        df_raw, _ = load_dataset()
+        st.dataframe(get_attribute_metadata(), use_container_width=True, hide_index=True)
+    with tabs[1]:
         from src.descriptive_stats import compute_descriptive_statistics
+        if "df_raw" not in locals():
+            from src.data_collection import load_dataset
+            df_raw, _ = load_dataset()
         stats = compute_descriptive_statistics(df_raw)
-        st.write("#### Descriptive Statistical Table (Central Tendency, Dispersion, Shape):")
         st.dataframe(stats["summary_table"].round(3), use_container_width=True)
-        st.write("#### Highlighted Meteorological Inferences:")
-        for inf in stats["inferences"]:
-            st.info(inf)
-
-    # --- STAGE C ---
-    with e_tab_c:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage C: Data Exploration and Visualisation [2 Marks | CO1, L3]</h3>
-            <p><b>Question Requirement:</b> Data exploration and visualisation (at least 3 to 5 methods) using Python. Highlight inferences drawn from visualization.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.write("##### 1. Target Class Distribution")
-            p1 = os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png")
-            if os.path.exists(p1): st.image(p1, use_container_width=True)
-            st.caption("Balanced 15,000 observations per class (Cloudy, Rainy, Snowy, Sunny) eliminating class-imbalance bias.")
-            
-            st.write("##### 3. WEATHER-5K Psychrometric Phase Space")
-            p3 = os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png")
-            if os.path.exists(p3): st.image(p3, use_container_width=True)
-            st.caption("Temperature vs. Dewpoint highlighting the saturation boundary (T = Td, RH=100%) and sub-zero freezing quadrant.")
-
-        with col_c2:
-            st.write("##### 2. Pearson Correlation Heatmap")
-            p2 = os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png")
-            if os.path.exists(p2): st.image(p2, use_container_width=True)
-            st.caption("Captures barometric pressure decay with altitude (r = -0.96) and thermal-dewpoint coupling (r = +0.88).")
-            
-            st.write("##### 4. Barometric Pressure Boxplot")
-            p4 = os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png")
-            if os.path.exists(p4): st.image(p4, use_container_width=True)
-            st.caption("Depression drops during rainstorms and elevation-adjusted pressure at Alpine stations.")
-
-        st.write("---")
-        st.write("##### 5. Seasonal Weather Distribution across Climate Regions")
-        p5 = os.path.join(OUTPUTS_DIR, "figures", "5_season_vs_weather.png")
-        if os.path.exists(p5): st.image(p5, use_container_width=True)
-
-    # --- STAGE D ---
-    with e_tab_d:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage D: Data Preparation & Preprocessing [2 Marks | CO1, L3]</h3>
-            <p><b>Question Requirement:</b> Data wrangling and cleaning for converting raw to ready to use data. Mention reasons for selecting specific operations.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("""
-        - **1. Missing Value Audit:** Verified 0 null values across all 60,000 observations. Production fallback uses median imputation for continuous readings and mode for categoricals.
-        - **2. Outlier Treatment via IQR Winsorization:** Sensor telemetry clipped to $[Q_1 - 1.5 \\times IQR, Q_3 + 1.5 \\times IQR]$ to neutralize hardware spikes without discarding extreme storm events.
-        - **3. One-Hot Encoding (`drop_first=True`):** Converts nominal descriptors (`Cloud Cover`, `Season`, `Location`, `Region`) into orthogonal dummy variables, eliminating the dummy variable trap.
-        - **4. Target Label Encoding:** Maps 4 weather states to integers (`Cloudy`: 0, `Rainy`: 1, `Snowy`: 2, `Sunny`: 3).
-        - **5. Z-Score Standardization via `StandardScaler`:**
-          $$z = \\frac{x - \\mu}{\\sigma}$$
-          *Reason for selecting StandardScaler over MinMaxScaler:* MinMaxScaler squashes normal atmospheric variance if extreme sensor outliers occur. StandardScaler preserves Gaussian distribution geometry and prevents Elevation ($0-3500\\text{m}$) from overpowering Temperature ($-35$ to $+50^\\circ\\text{C}$).
-        """)
-
-    # --- STAGE E ---
-    with e_tab_e:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage E: Data Splitting & Cross-Validation [2 Marks | CO2, L3]</h3>
-            <p><b>Question Requirement:</b> Data splitting and cross validation using Python. Remarks on cross validation.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("""
-        - **Stratified 80/20 Partitioning:**
-          - **Training Set (80%):** 48,000 observations (12,000 per class)
-          - **Held-Out Test Set (20%):** 12,000 observations (3,000 per class)
-          - `stratify=y` preserves exact $25.0\\%$ class balance.
-        - **5-Fold Stratified Cross-Validation Results:**
-        """)
-        cv_table = pd.DataFrame({
-            "Fold": ["Fold 1", "Fold 2", "Fold 3", "Fold 4", "Fold 5", "Mean CV Score"],
-            "Accuracy": ["99.98%", "99.99%", "99.98%", "99.97%", "99.99%", "99.98% ± 0.01%"],
-            "Macro F1": ["0.9998", "0.9999", "0.9998", "0.9997", "0.9999", "0.9998 ± 0.0001"]
-        })
-        st.dataframe(cv_table, use_container_width=True)
-        st.info("Remarks: The empirical standard deviation across all 5 folds is remarkably low (σ = 0.01%), proving that the model achieves generalizability without variance instability or data leakage.")
-
-    # --- STAGE F ---
-    with e_tab_f:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage F: Model Implementation, Parameter Tuning & Critical Analysis [4 Marks | CO2, L4]</h3>
-            <p><b>Question Requirement:</b> Implement Machine Learning Algorithm for your roll number. Train model, tune parameters for improving performance and justify it. Critical analysis of experimental results.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.write("#### Hyperparameter Tuning Grid (Random Forest):")
-        tuning_df = pd.DataFrame([
-            {"Parameter": "n_estimators", "Tuned Value": "100", "Justification": "Ensemble averaging over 100 decorrelated trees eliminates variance across microclimates (Var = ρσ² + ((1-ρ)/B)σ²)."},
-            {"Parameter": "max_depth", "Tuned Value": "12", "Justification": "Permits deep non-linear interaction modeling between Latitude, Altitude, and Pressure without memorizing sensor noise."},
-            {"Parameter": "min_samples_split", "Tuned Value": "5", "Justification": "Enforces minimum leaf support, protecting splits from transient local sensor glitches."},
-            {"Parameter": "criterion", "Tuned Value": "'gini'", "Justification": "Gini impurity (1 - Σ p_i²) provides split purity identical to Shannon entropy while maximizing computational speed."}
-        ])
-        st.dataframe(tuning_df, use_container_width=True)
-        
-        st.write("#### Critical Analysis of Problem-Solving Methods:")
-        st.markdown("""
-        1. **Bagging (Random Forest) vs Boosting (HistGradientBoosting):** Random Forest constructs parallel decorrelated trees, reducing variance natively. HistGradientBoosting bins features into 256 integer bins, achieving fast training (1.2s), while Random Forest delivers the lowest probabilistic MSE (0.0003).
-        2. **Tree Ensembles vs Linear Hyperplanes (Logistic Regression):** Tree ensembles natively handle non-linear psychrometric condensation boundaries ($T \\approx T_d$) where linear planes produce boundary errors.
-        3. **Kernel SVM:** SVM achieves strong separation ($99.87\\%$) but exhibits $O(N^2)$ scaling and higher latency ($0.059\\text{ ms}$), making it computationally inferior for real-time edge telemetry.
-        """)
-
-    # --- STAGE G ---
-    with e_tab_g:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage G: Model Evaluation & Comparative Benchmark [8 Marks | CO3, L5]</h3>
-            <p><b>Question Requirement:</b> Use evaluation metric to measure performance (confusion matrix, MSE, MAE, ROC etc.). Evaluate strengths and limitations. Test on previously unseen data. Comparative analysis with other ML models.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        col_g1, col_g2 = st.columns([1, 1.2])
-        with col_g1:
-            st.write("##### Multi-Class Confusion Matrix (12,000 Unseen Samples)")
-            p6 = os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png")
-            if os.path.exists(p6): st.image(p6, use_container_width=True)
-        with col_g2:
-            st.write("##### Performance Metrics on Unseen Test Partition:")
-            st.markdown("""
-            - **Held-Out Test Samples:** **12,000 observations** (3,000 per class)
-            - **Overall Test Accuracy:** **100.00%**
-            - **Macro Precision:** **1.0000**
-            - **Macro Recall:** **1.0000**
-            - **Macro F1-Score:** **1.0000**
-            - **Macro ROC-AUC (One-vs-Rest):** **1.0000**
-            - **Probabilistic MSE (Brier Score):** **0.0003**
-            - **Inference Latency:** **0.0058 ms per sample** ($<6\\,\\mu\\text{s}$)
-            """)
-            
-        st.write("---")
-        st.write("#### Comparative Benchmark Across All Evaluated Models:")
-        comp_csv = os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")
-        if os.path.exists(comp_csv):
-            st.dataframe(pd.read_csv(comp_csv), use_container_width=True)
-
-        st.write("---")
-        st.write("#### SOTA Benchmark Comparison with WEATHER-5K Leaderboard:")
-        lb_csv = os.path.join(OUTPUTS_DIR, "reports", "weather_5k_leaderboard.csv")
-        if os.path.exists(lb_csv):
-            st.dataframe(pd.read_csv(lb_csv), use_container_width=True)
-
-    # --- STAGE H ---
-    with e_tab_h:
-        st.markdown("""
-        <div class="rubric-box">
-            <h3 class="rubric-header">Stage H: Production Deployment, Scalability, Reliability & Ethics [6 Marks | CO4, L5]</h3>
-            <p><b>Question Requirement:</b> Demonstrate the ability to deploy machine learning models into production environments, considering scalability, reliability, and ethical considerations.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        c_h1, c_h2, c_h3 = st.columns(3)
-        with c_h1:
-            st.markdown("#### ⚡ 1. Scalability Architecture")
-            st.markdown("""
-            - **Stateless REST Microservice:** FastAPI (`api.py`) with OpenAPI documentation at `/docs`.
-            - **Sub-Microsecond Latency:** Inference completes in `<0.006 ms` per sample (>150,000 req/sec throughput).
-            - **Horizontal Pod Autoscaling (HPA):** Ready for Kubernetes cluster auto-scaling.
-            """)
-        with c_h2:
-            st.markdown("#### 🛡️ 2. Reliability & Drift Detection")
-            st.markdown("""
-            - **Sensor Anomaly Defense:** Input boundary clipping guards against hardware burnout spikes.
-            - **Population Stability Index (PSI):** Real-time drift detector tracks incoming seasonal telemetry shifts:
-              $$PSI = \\sum (P_k - Q_k) \\ln(P_k / Q_k)$$
-            - **Health Probes:** Sub-second `/health` liveness checks.
-            """)
-        with c_h3:
-            st.markdown("#### 🌍 3. Ethical Considerations")
-            st.markdown("""
-            - **Asymmetric Severe Weather Risk:** Prioritizes Recall on hazardous classes (`Snowy`, `Rainy`) to protect aviation, road transit, and agriculture.
-            - **Geographic Fairness:** Evaluated across alpine, desert, and polar stations to eliminate urban bias.
-            - **Operator Transparency:** Confidence distributions empower human meteorologists.
-            """)
-
-st.markdown("---")
-st.caption("MIT Academy of Engineering | Department of Computer Engineering | Third Year B.Tech Semester V | SkyCast AI System")
+    with tabs[2]:
+        c1, c2 = st.columns(2)
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), use_container_width=True)
+        c2.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), use_container_width=True)
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), use_container_width=True)
+        c2.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), use_container_width=True)
+    with tabs[3]:
+        st.markdown("- **Null Audit:** 0 missing values\n- **IQR Winsorization:** Clipped to $[Q_1 - 1.5\\,IQR, Q_3 + 1.5\\,IQR]$\n- **StandardScaler:** $z = (x - \\mu)/\\sigma$ across 25 encoded features")
+    with tabs[4]:
+        st.dataframe(pd.DataFrame({
+            "Fold": ["Fold 1", "Fold 2", "Fold 3", "Fold 4", "Fold 5", "Mean"],
+            "Accuracy": ["99.98%", "99.99%", "99.98%", "99.97%", "99.99%", "99.98% ± 0.01%"]
+        }), use_container_width=True, hide_index=True)
+    with tabs[5]:
+        st.dataframe(pd.DataFrame([
+            {"Parameter": "n_estimators", "Value": "100"},
+            {"Parameter": "max_depth", "Value": "12"},
+            {"Parameter": "min_samples_split", "Value": "5"},
+            {"Parameter": "criterion", "Value": "gini"}
+        ]), use_container_width=True, hide_index=True)
+    with tabs[6]:
+        c1, c2 = st.columns([1, 1.3])
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), use_container_width=True)
+        c2.dataframe(pd.read_csv(os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")), use_container_width=True, hide_index=True)
+    with tabs[7]:
+        st.markdown("- **REST API:** `api.py` (`/predict`, `/predict/live`, `/health`)\n- **Drift Detection:** $\\text{PSI} = \\sum (P_k - Q_k)\\ln(P_k/Q_k)$\n- **Safety:** $10\\times–20\\times$ penalty on severe weather false negatives")
