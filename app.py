@@ -6,6 +6,7 @@ Features: Live Satellite Telemetry (Open-Meteo), Interactive World Map, Telemetr
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import joblib
@@ -351,6 +352,75 @@ def search_city_geocoding(query: str):
     except Exception:
         return []
 
+def detect_location_via_ip():
+    """Detects approximate city & coordinates via free IP geolocation APIs."""
+    for url in ["http://ip-api.com/json/", "https://ipapi.co/json/"]:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
+            with urllib.request.urlopen(req, timeout=4.0) as r:
+                d = json.loads(r.read().decode('utf-8'))
+                lat = d.get("lat") or d.get("latitude")
+                lon = d.get("lon") or d.get("longitude")
+                if lat is not None and lon is not None:
+                    return {
+                        "success": True,
+                        "lat": float(lat),
+                        "lon": float(lon),
+                        "city": d.get("city", "My Location"),
+                        "country": d.get("country") or d.get("country_name", "")
+                    }
+        except Exception:
+            continue
+    return {"success": False}
+
+@st.cache_data(ttl=600, show_spinner=False)
+def reverse_geocode_coords(lat: float, lon: float):
+    """Converts browser GPS (lat, lon) to city & country via free OpenStreetMap Nominatim."""
+    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=4.0) as r:
+            d = json.loads(r.read().decode('utf-8'))
+            addr = d.get("address", {})
+            city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("state_district") or addr.get("state") or "My GPS Location"
+            country = addr.get("country", "")
+            return city, country
+    except Exception:
+        return f"GPS ({lat:.2f}, {lon:.2f})", ""
+
+def build_live_city_pin(t_lat: float, t_lon: float, t_name: str, t_country: str, t_alt: float = 50.0, flag: str = "📍"):
+    """Fetches live satellite weather for any coordinate and builds a 3D map pin + AI prediction."""
+    live_city = fetch_live_telemetry_for_coords(t_lat, t_lon, include_hourly=True)
+    if not live_city.get("success"):
+        return None
+    reg, loc_t, seas = infer_region_and_season(t_lat, t_alt)
+    pred_c, _, conf = predict_weather_with_ai(
+        t_lat, t_lon, t_alt, live_city["tmp"], live_city["dpt"], live_city["rh"],
+        live_city["wspd"], live_city["wdir"], live_city["precip"], live_city["slp"],
+        live_city["uv"], live_city["vis"], live_city["cloud"], seas, loc_t, reg,
+        wmo_cat=live_city["wmo_cat"]
+    )
+    c_rgba = WEATHER_COLOR_MAP.get(pred_c, [16, 185, 129, 235])
+    return {
+        "key": t_name, "station_id": "LIVE-LOC", "station_name": t_name,
+        "country": t_country, "flag": flag, "lat": t_lat, "lon": t_lon, "alt": t_alt,
+        "region": reg, "loc": loc_t, "season": seas,
+        "tmp": round(live_city["tmp"], 1), "feels_like": round(live_city["feels_like"], 1),
+        "dpt": round(live_city["dpt"], 1), "rh": live_city["rh"],
+        "wspd": round(live_city["wspd"], 1), "wgust": round(live_city["wgust"], 1),
+        "wdir": round(live_city["wdir"], 0), "slp": round(live_city["slp"], 1),
+        "precip": round(live_city["precip"], 0), "uv": live_city["uv"],
+        "vis": round(live_city["vis"], 1), "cloud": live_city["cloud"],
+        "cloud_pct": live_city["cloud_pct"], "wmo_desc": live_city["wmo_desc"],
+        "predicted_weather": pred_c, "weather_badge": WEATHER_BADGE_MAP.get(pred_c, pred_c),
+        "map_label": f"{flag} {t_name} • {live_city['tmp']:.0f}°C",
+        "confidence": round(conf, 1), "color_rgba": c_rgba,
+        "halo_rgba": [0, 255, 255, 95], "radius": 240000, "halo_radius": 450000,
+        "col_elevation": max(80000.0, (live_city["tmp"] + 20.0) * 16000.0),
+        "is_live": True, "live_ts": live_city["timestamp"],
+        "hourly": live_city.get("hourly", {})
+    }
+
 # -------------------------------------------------------------------------
 # REAL-TIME LIVE DATA HARVESTER (Open-Meteo Satellite & Ground Station API)
 # -------------------------------------------------------------------------
@@ -653,9 +723,83 @@ if app_mode == "🚀 Live Weather Prediction Website":
         st.subheader("🌍 Interactive 3D/2D Global Weather Radar & AI Map")
         st.caption("Real-time satellite meteorology (ECMWF/NOAA/DWD via Open-Meteo) fused with SkyCast AI classification across 28 global observatories + any searched city worldwide.")
 
-        # --- LIVE GLOBAL CITY SEARCH BAR (FREE GEOCODING API) ---
+        # --- LIVE GLOBAL CITY SEARCH & MY-LOCATION DETECTION ---
         if "custom_city_pin" not in st.session_state:
             st.session_state.custom_city_pin = None
+
+        # Check if Browser GPS redirected with ?my_lat=...&my_lon=...
+        qp = st.query_params
+        if "my_lat" in qp and "my_lon" in qp:
+            try:
+                gps_lat = float(qp["my_lat"])
+                gps_lon = float(qp["my_lon"])
+                city_n, country_n = reverse_geocode_coords(gps_lat, gps_lon)
+                pin = build_live_city_pin(gps_lat, gps_lon, f"{city_n} (My GPS)", country_n, flag="🛰️")
+                if pin:
+                    st.session_state.custom_city_pin = pin
+                st.query_params.clear()
+            except Exception:
+                st.query_params.clear()
+
+        # My Location Access Bar (Browser GPS Permission + Network IP Fallback)
+        loc_c1, loc_c2, loc_c3 = st.columns([1.4, 1.2, 2.0])
+        with loc_c1:
+            components.html("""
+            <div style="font-family: system-ui, sans-serif;">
+                <button id="gpsBtn" onclick="getLoc()" style="
+                    width: 100%; padding: 0.52rem 0.85rem; border-radius: 8px;
+                    border: 1px solid #2563EB; background: linear-gradient(135deg, #2563EB, #1D4ED8);
+                    color: white; font-weight: 600; font-size: 0.88rem; cursor: pointer;
+                    box-shadow: 0 2px 6px rgba(37,99,235,0.28);
+                ">📍 Allow Browser GPS Location</button>
+                <div id="gpsStatus" style="font-size: 11px; color: #6B7280; margin-top: 3px;"></div>
+                <script>
+                function getLoc() {
+                    const st = document.getElementById('gpsStatus');
+                    if (!navigator.geolocation) {
+                        st.innerText = 'Geolocation not supported by browser.';
+                        return;
+                    }
+                    st.innerText = 'Requesting location permission...';
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            st.innerText = 'Location found! Loading live weather...';
+                            const lat = pos.coords.latitude.toFixed(5);
+                            const lon = pos.coords.longitude.toFixed(5);
+                            try {
+                                const url = new URL(window.top.location.href);
+                                url.searchParams.set('my_lat', lat);
+                                url.searchParams.set('my_lon', lon);
+                                window.top.location.href = url.toString();
+                            } catch (e) {
+                                st.innerText = 'GPS: ' + lat + ', ' + lon + ' (use Network button if blocked)';
+                            }
+                        },
+                        (err) => {
+                            st.innerText = 'Permission denied/unavailable. Use Network Auto-Detect →';
+                        },
+                        { enableHighAccuracy: true, timeout: 8000 }
+                    );
+                }
+                </script>
+            </div>
+            """, height=64)
+        with loc_c2:
+            if st.button("🌐 Auto-Detect My Location (IP)", use_container_width=True, help="Instantly detects your city & coordinates via network IP without needing GPS"):
+                with st.spinner("Detecting your current location..."):
+                    ip_loc = detect_location_via_ip()
+                    if ip_loc.get("success"):
+                        pin = build_live_city_pin(
+                            ip_loc["lat"], ip_loc["lon"],
+                            f"{ip_loc['city']} (My Location)", ip_loc["country"], flag="📍"
+                        )
+                        if pin:
+                            st.session_state.custom_city_pin = pin
+                            st.rerun()
+                    else:
+                        st.error("Could not auto-detect IP location. Try searching your city below.")
+        with loc_c3:
+            st.info("💡 Click **Allow Browser GPS Location** for exact GPS weather, or **Auto-Detect My Location** for instant local detection.")
 
         s_col1, s_col2, s_col3 = st.columns([2.2, 1.3, 0.8])
         with s_col1:
@@ -679,35 +823,9 @@ if app_mode == "🚀 Live Weather Prediction Website":
                 t_name = target["name"]
                 t_country = target.get("country", "")
                 with st.spinner(f"Fetching live satellite feed for {t_name}..."):
-                    live_city = fetch_live_telemetry_for_coords(t_lat, t_lon, include_hourly=True)
-                    if live_city.get("success"):
-                        reg, loc_t, seas = infer_region_and_season(t_lat, t_alt)
-                        pred_c, pred_p, conf = predict_weather_with_ai(
-                            t_lat, t_lon, t_alt, live_city["tmp"], live_city["dpt"], live_city["rh"],
-                            live_city["wspd"], live_city["wdir"], live_city["precip"], live_city["slp"],
-                            live_city["uv"], live_city["vis"], live_city["cloud"], seas, loc_t, reg,
-                            wmo_cat=live_city["wmo_cat"]
-                        )
-                        c_rgba = WEATHER_COLOR_MAP.get(pred_c, [16, 185, 129, 235])
-                        st.session_state.custom_city_pin = {
-                            "key": t_name, "station_id": "LIVE-GEO", "station_name": t_name,
-                            "country": t_country, "flag": "📍", "lat": t_lat, "lon": t_lon, "alt": t_alt,
-                            "region": reg, "loc": loc_t, "season": seas,
-                            "tmp": round(live_city["tmp"], 1), "feels_like": round(live_city["feels_like"], 1),
-                            "dpt": round(live_city["dpt"], 1), "rh": live_city["rh"],
-                            "wspd": round(live_city["wspd"], 1), "wgust": round(live_city["wgust"], 1),
-                            "wdir": round(live_city["wdir"], 0), "slp": round(live_city["slp"], 1),
-                            "precip": round(live_city["precip"], 0), "uv": live_city["uv"],
-                            "vis": round(live_city["vis"], 1), "cloud": live_city["cloud"],
-                            "cloud_pct": live_city["cloud_pct"], "wmo_desc": live_city["wmo_desc"],
-                            "predicted_weather": pred_c, "weather_badge": WEATHER_BADGE_MAP.get(pred_c, pred_c),
-                            "map_label": f"📍 {t_name} • {live_city['tmp']:.0f}°C",
-                            "confidence": round(conf, 1), "color_rgba": c_rgba,
-                            "halo_rgba": [0, 255, 255, 95], "radius": 240000, "halo_radius": 450000,
-                            "col_elevation": max(80000.0, (live_city["tmp"] + 20.0) * 16000.0),
-                            "is_live": True, "live_ts": live_city["timestamp"],
-                            "hourly": live_city.get("hourly", {})
-                        }
+                    pin = build_live_city_pin(t_lat, t_lon, t_name, t_country, t_alt=t_alt, flag="📍")
+                    if pin:
+                        st.session_state.custom_city_pin = pin
 
         # Display Custom Searched City Live Card & 96h Forecast if active
         if st.session_state.custom_city_pin:
