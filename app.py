@@ -286,35 +286,190 @@ WEATHER_BADGE_MAP = {
     "Snowy": "❄️ Snowy"
 }
 
+# WMO Weather Interpretation Codes (Ground-Truth Satellite / Station Classification)
+WMO_CODE_MAP = {
+    0: ("Clear Sky", "Sunny"),
+    1: ("Mainly Clear", "Sunny"),
+    2: ("Partly Cloudy", "Cloudy"),
+    3: ("Overcast", "Cloudy"),
+    45: ("Fog", "Cloudy"),
+    48: ("Depositing Rime Fog", "Cloudy"),
+    51: ("Light Drizzle", "Rainy"),
+    53: ("Moderate Drizzle", "Rainy"),
+    55: ("Dense Drizzle", "Rainy"),
+    56: ("Freezing Drizzle", "Snowy"),
+    57: ("Dense Freezing Drizzle", "Snowy"),
+    61: ("Slight Rain", "Rainy"),
+    63: ("Moderate Rain", "Rainy"),
+    65: ("Heavy Rain", "Rainy"),
+    66: ("Freezing Rain", "Snowy"),
+    67: ("Heavy Freezing Rain", "Snowy"),
+    71: ("Slight Snowfall", "Snowy"),
+    73: ("Moderate Snowfall", "Snowy"),
+    75: ("Heavy Snowfall", "Snowy"),
+    77: ("Snow Grains", "Snowy"),
+    80: ("Slight Rain Showers", "Rainy"),
+    81: ("Moderate Rain Showers", "Rainy"),
+    82: ("Violent Rain Showers", "Rainy"),
+    85: ("Slight Snow Showers", "Snowy"),
+    86: ("Heavy Snow Showers", "Snowy"),
+    95: ("Thunderstorm", "Rainy"),
+    96: ("Thunderstorm + Hail", "Rainy"),
+    99: ("Severe Thunderstorm", "Rainy"),
+}
+
+def infer_region_and_season(lat: float, alt: float):
+    """Infers true astronomical season from current date/hemisphere and macroclimate region."""
+    month = datetime.date.today().month
+    if lat >= 0:
+        season = "Winter" if month in (12, 1, 2) else ("Spring" if month in (3, 4, 5) else ("Summer" if month in (6, 7, 8) else "Autumn"))
+    else:
+        season = "Summer" if month in (12, 1, 2) else ("Autumn" if month in (3, 4, 5) else ("Winter" if month in (6, 7, 8) else "Spring"))
+
+    if alt >= 1200:
+        region, loc = "Alpine Mountain Highlands", "mountain"
+    elif abs(lat) <= 23.5:
+        region, loc = "Equatorial Tropical", "coastal"
+    elif abs(lat) >= 58.0:
+        region, loc = "Nordic / Sub-Polar", "coastal"
+    else:
+        region, loc = "Temperate Continental", "inland"
+    return region, loc, season
+
+@st.cache_data(ttl=600, show_spinner=False)
+def search_city_geocoding(query: str):
+    """Free Open-Meteo Geocoding API lookup (no API key required)."""
+    if not query or len(query.strip()) < 2:
+        return []
+    encoded = urllib.request.quote(query.strip())
+    url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded}&count=5&language=en&format=json"
+    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=4.0) as r:
+            data = json.loads(r.read().decode('utf-8'))
+            return data.get("results", [])
+    except Exception:
+        return []
+
 # -------------------------------------------------------------------------
 # REAL-TIME LIVE DATA HARVESTER (Open-Meteo Satellite & Ground Station API)
 # -------------------------------------------------------------------------
-def fetch_live_telemetry_for_coords(lat: float, lon: float):
-    """Fetches real-time live atmospheric telemetry from Open-Meteo satellite feed."""
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,uv_index,visibility"
-    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/2.0'})
+def fetch_live_telemetry_for_coords(lat: float, lon: float, include_hourly: bool = False):
+    """
+    Fetches real-time live atmospheric telemetry from Open-Meteo satellite feed
+    (ECMWF / NOAA GFS / DWD ICON) including WMO ground truth & precipitation probability.
+    """
+    hourly_param = "&hourly=temperature_2m,precipitation_probability,surface_pressure&forecast_days=4" if include_hourly else "&hourly=precipitation_probability&forecast_days=1"
+    url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+        f"&current=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,"
+        f"surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation,"
+        f"cloud_cover,uv_index,visibility,weather_code,is_day{hourly_param}&timezone=auto"
+    )
+    req = urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/3.0'})
     try:
-        with urllib.request.urlopen(req, timeout=3.5) as r:
+        with urllib.request.urlopen(req, timeout=4.0) as r:
             data = json.loads(r.read().decode('utf-8'))
             cur = data.get('current', {})
-            cc = cur.get('cloud_cover', 0)
-            cloud = 'clear' if cc < 20 else ('partly cloudy' if cc < 50 else ('cloudy' if cc < 80 else 'overcast'))
-            return {
+            hourly = data.get('hourly', {})
+
+            cc = float(cur.get('cloud_cover', 0))
+            wmo_code = int(cur.get('weather_code', 0))
+            wmo_desc, wmo_cat = WMO_CODE_MAP.get(wmo_code, ("Variable", "Cloudy"))
+
+            # Map cloud cover accurately using both cloud_cover % and WMO code
+            if wmo_cat in ("Rainy", "Snowy") or cc >= 80:
+                cloud = "overcast" if cc >= 70 else "cloudy"
+            elif cc < 20:
+                cloud = "clear"
+            elif cc < 50:
+                cloud = "partly cloudy"
+            else:
+                cloud = "cloudy"
+
+            # Use true hourly precipitation probability when available
+            precip_probs = hourly.get('precipitation_probability', [])
+            if precip_probs and precip_probs[0] is not None:
+                precip_pct = float(precip_probs[0])
+            else:
+                precip_pct = float(min(100.0, cur.get('precipitation', 0.0) * 25.0))
+                if wmo_cat in ("Rainy", "Snowy") and precip_pct < 60.0:
+                    precip_pct = 75.0
+
+            res = {
                 "success": True,
                 "tmp": float(cur.get('temperature_2m', 20.0)),
+                "feels_like": float(cur.get('apparent_temperature', cur.get('temperature_2m', 20.0))),
                 "dpt": float(cur.get('dew_point_2m', 15.0)),
                 "rh": int(cur.get('relative_humidity_2m', 60)),
                 "slp": float(cur.get('surface_pressure', 1013.25)),
                 "wspd": float(cur.get('wind_speed_10m', 10.0)),
                 "wdir": float(cur.get('wind_direction_10m', 180.0)),
-                "precip": float(min(100.0, cur.get('precipitation', 0.0) * 20.0)),
+                "wgust": float(cur.get('wind_gusts_10m', cur.get('wind_speed_10m', 10.0))),
+                "precip": precip_pct,
+                "precip_mm": float(cur.get('precipitation', 0.0)),
                 "cloud": cloud,
-                "uv": int(cur.get('uv_index', 3)),
+                "cloud_pct": int(cc),
+                "uv": int(round(float(cur.get('uv_index', 3)))),
                 "vis": float(min(20.0, cur.get('visibility', 10000.0) / 1000.0)),
+                "wmo_code": wmo_code,
+                "wmo_desc": wmo_desc,
+                "wmo_cat": wmo_cat,
+                "is_day": int(cur.get('is_day', 1)),
                 "timestamp": cur.get('time', datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
             }
+            if include_hourly and hourly:
+                res["hourly"] = hourly
+            return res
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+def predict_weather_with_ai(lat, lon, alt, temp, dpt, rh, wspd, wdir, precip, slp, uv, vis, cloud, season, loc, region, wmo_cat=None):
+    """Runs ML inference and computes calibrated confidence + WMO ground-truth consensus."""
+    row = {col: 0.0 for col in feature_cols}
+    row['Latitude'] = float(lat)
+    row['Longitude'] = float(lon)
+    row['Altitude (m)'] = float(alt)
+    row['Temperature'] = float(temp)
+    row['Dewpoint'] = float(dpt)
+    row['Humidity'] = float(rh)
+    row['Wind Speed'] = float(wspd)
+    row['Wind Direction'] = float(wdir)
+    row['Precipitation (%)'] = float(precip)
+    row['Atmospheric Pressure'] = float(slp)
+    row['UV Index'] = float(uv)
+    row['Visibility (km)'] = float(vis)
+
+    for prefix, val in [("Cloud Cover", cloud), ("Season", season), ("Location", loc), ("Region", region)]:
+        col_name = f"{prefix}_{val}"
+        if col_name in row:
+            row[col_name] = 1.0
+
+    input_df = pd.DataFrame([row])[feature_cols]
+    scaled_input = pd.DataFrame(scaler.transform(input_df), columns=feature_cols)
+    pred_idx = model.predict(scaled_input)[0]
+    pred_class = le.inverse_transform([pred_idx])[0]
+    pred_probs = model.predict_proba(scaled_input)[0]
+    confidence = float(pred_probs[pred_idx] * 100.0)
+
+    # Physics & WMO ground-truth calibration guard for live satellite edge cases
+    # (e.g., nighttime clear sky has UV=0 which shouldn't force Snowy/Cloudy when temp > 10°C)
+    if wmo_cat and wmo_cat in le.classes_:
+        wmo_idx = list(le.classes_).index(wmo_cat)
+        # Blend AI probability (75%) with real-time WMO satellite ground truth (25%) for transition zones
+        blended_probs = 0.75 * pred_probs
+        blended_probs[wmo_idx] += 0.25
+        # Physical sub-zero guard: never predict Snowy above 4°C
+        if temp > 4.0 and "Snowy" in le.classes_:
+            snow_idx = list(le.classes_).index("Snowy")
+            blended_probs[snow_idx] = 0.0
+            blended_probs = blended_probs / blended_probs.sum()
+        final_idx = int(np.argmax(blended_probs))
+        pred_class = le.inverse_transform([final_idx])[0]
+        pred_probs = blended_probs
+        confidence = float(pred_probs[final_idx] * 100.0)
+
+    return pred_class, pred_probs, confidence
 
 @st.cache_data(ttl=180, show_spinner=False)
 def get_global_station_telemetry_df(live_mode: bool = True):
@@ -330,8 +485,15 @@ def get_global_station_telemetry_df(live_mode: bool = True):
         s_data = s.copy()
         is_live = False
         live_ts = "Historical Station Benchmark"
+        wmo_desc, wmo_cat = "Benchmark", None
+        feels_like = s_data["tmp"]
+        wgust = s_data["wspd"] * 1.2
+        cloud_pct = 15 if s_data["cloud"] == "clear" else (40 if s_data["cloud"] == "partly cloudy" else (65 if s_data["cloud"] == "cloudy" else 90))
 
+        # Use true astronomical season when in live mode
+        _, _, true_season = infer_region_and_season(s_data["lat"], s_data["alt"])
         if live_mode:
+            s_data["season"] = true_season
             live_res = fetch_live_telemetry_for_coords(s["lat"], s["lon"])
             if live_res.get("success"):
                 s_data["tmp"] = live_res["tmp"]
@@ -344,10 +506,14 @@ def get_global_station_telemetry_df(live_mode: bool = True):
                 s_data["cloud"] = live_res["cloud"]
                 s_data["uv"] = live_res["uv"]
                 s_data["vis"] = live_res["vis"]
+                feels_like = live_res["feels_like"]
+                wgust = live_res["wgust"]
+                cloud_pct = live_res["cloud_pct"]
+                wmo_desc = live_res["wmo_desc"]
+                wmo_cat = live_res["wmo_cat"]
                 is_live = True
                 live_ts = live_res["timestamp"]
 
-        # Ensure psychrometric consistency
         temp = s_data["tmp"]
         dpt = min(s_data["dpt"], temp)
         if "rh" not in s_data:
@@ -356,41 +522,17 @@ def get_global_station_telemetry_df(live_mode: bool = True):
         else:
             rh = s_data["rh"]
 
-        # Build feature vector
-        row = {col: 0.0 for col in feature_cols}
-        row['Latitude'] = float(s_data["lat"])
-        row['Longitude'] = float(s_data["lon"])
-        row['Altitude (m)'] = float(s_data["alt"])
-        row['Temperature'] = float(temp)
-        row['Dewpoint'] = float(dpt)
-        row['Humidity'] = float(rh)
-        row['Wind Speed'] = float(s_data["wspd"])
-        row['Wind Direction'] = float(s_data["wdir"])
-        row['Precipitation (%)'] = float(s_data["precip"])
-        row['Atmospheric Pressure'] = float(s_data["slp"])
-        row['UV Index'] = float(s_data["uv"])
-        row['Visibility (km)'] = float(s_data["vis"])
-
-        cloud_col = f"Cloud Cover_{s_data['cloud']}"
-        if cloud_col in row: row[cloud_col] = 1.0
-
-        season_col = f"Season_{s_data['season']}"
-        if season_col in row: row[season_col] = 1.0
-
-        loc_col = f"Location_{s_data['loc']}"
-        if loc_col in row: row[loc_col] = 1.0
-
-        reg_col = f"Region_{s_data['region']}"
-        if reg_col in row: row[reg_col] = 1.0
-
-        input_df = pd.DataFrame([row])[feature_cols]
-        scaled_input = pd.DataFrame(scaler.transform(input_df), columns=feature_cols)
-        pred_idx = model.predict(scaled_input)[0]
-        pred_class = le.inverse_transform([pred_idx])[0]
-        pred_probs = model.predict_proba(scaled_input)[0]
-        confidence = float(pred_probs[pred_idx] * 100.0)
+        pred_class, _, confidence = predict_weather_with_ai(
+            s_data["lat"], s_data["lon"], s_data["alt"], temp, dpt, rh,
+            s_data["wspd"], s_data["wdir"], s_data["precip"], s_data["slp"],
+            s_data["uv"], s_data["vis"], s_data["cloud"], s_data["season"],
+            s_data["loc"], s_data["region"], wmo_cat=wmo_cat if is_live else None
+        )
 
         color_rgba = WEATHER_COLOR_MAP.get(pred_class, [16, 185, 129, 220])
+        halo_rgba = [color_rgba[0], color_rgba[1], color_rgba[2], 65]
+        # 3D column height proportional to temperature (shifted positive)
+        col_elevation = max(60000.0, (temp + 20.0) * 14000.0)
 
         return {
             "key": key,
@@ -404,27 +546,34 @@ def get_global_station_telemetry_df(live_mode: bool = True):
             "region": s_data["region"],
             "loc": s_data["loc"],
             "season": s_data["season"],
-            "tmp": temp,
-            "dpt": dpt,
+            "tmp": round(temp, 1),
+            "feels_like": round(feels_like, 1),
+            "dpt": round(dpt, 1),
             "rh": rh,
-            "wspd": s_data["wspd"],
-            "wdir": s_data["wdir"],
-            "slp": s_data["slp"],
-            "precip": s_data["precip"],
+            "wspd": round(s_data["wspd"], 1),
+            "wgust": round(wgust, 1),
+            "wdir": round(s_data["wdir"], 0),
+            "slp": round(s_data["slp"], 1),
+            "precip": round(s_data["precip"], 0),
             "uv": s_data["uv"],
-            "vis": s_data["vis"],
+            "vis": round(s_data["vis"], 1),
             "cloud": s_data["cloud"],
+            "cloud_pct": cloud_pct,
+            "wmo_desc": wmo_desc,
             "predicted_weather": pred_class,
             "weather_badge": WEATHER_BADGE_MAP.get(pred_class, pred_class),
+            "map_label": f"{s_data['name']} • {temp:.0f}°C",
             "confidence": round(confidence, 1),
             "color_rgba": color_rgba,
-            "radius": 180000 + (s_data["wspd"] * 3000),
+            "halo_rgba": halo_rgba,
+            "radius": 160000 + (s_data["wspd"] * 3500),
+            "halo_radius": 320000 + (s_data["precip"] * 3500),
+            "col_elevation": col_elevation,
             "is_live": is_live,
             "live_ts": live_ts
         }
 
-    # Parallel retrieval across 28 global stations
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=14) as executor:
         records = list(executor.map(fetch_station, GLOBAL_WEATHER_STATIONS.items()))
 
     return pd.DataFrame(records)
@@ -501,14 +650,97 @@ if app_mode == "🚀 Live Weather Prediction Website":
     # SUB-TAB 1: GLOBAL WORLD MAP WITH WEATHER PREDICTIONS & TELEMETRY
     # ---------------------------------------------------------------------
     with web_tab_map:
-        st.subheader("🌍 Interactive Global Weather World Map")
-        st.caption("Live AI weather classifications, barometric pressure, wind telemetry, and atmospheric readings across 28 global observatories.")
+        st.subheader("🌍 Interactive 3D/2D Global Weather Radar & AI Map")
+        st.caption("Real-time satellite meteorology (ECMWF/NOAA/DWD via Open-Meteo) fused with SkyCast AI classification across 28 global observatories + any searched city worldwide.")
+
+        # --- LIVE GLOBAL CITY SEARCH BAR (FREE GEOCODING API) ---
+        if "custom_city_pin" not in st.session_state:
+            st.session_state.custom_city_pin = None
+
+        s_col1, s_col2, s_col3 = st.columns([2.2, 1.3, 0.8])
+        with s_col1:
+            city_query = st.text_input("🔍 Search Any City Worldwide (Live Free Satellite & AI Forecast):", placeholder="e.g., Pune, Mumbai, Tokyo, London, New York, Manali, Zurich...")
+        with s_col2:
+            city_matches = search_city_geocoding(city_query) if city_query else []
+            if city_matches:
+                match_labels = [f"{m['name']}, {m.get('admin1', '')} ({m.get('country', '')})" for m in city_matches]
+                selected_match_idx = st.selectbox("Select Location Match:", range(len(match_labels)), format_func=lambda i: match_labels[i])
+            else:
+                selected_match_idx = None
+                st.caption("Type any city name above to geolocate & fetch live weather.")
+        with s_col3:
+            st.write("")
+            st.write("")
+            if st.button("📍 Locate & Predict", use_container_width=True, disabled=(selected_match_idx is None)):
+                target = city_matches[selected_match_idx]
+                t_lat = float(target["latitude"])
+                t_lon = float(target["longitude"])
+                t_alt = float(target.get("elevation", 50.0) or 50.0)
+                t_name = target["name"]
+                t_country = target.get("country", "")
+                with st.spinner(f"Fetching live satellite feed for {t_name}..."):
+                    live_city = fetch_live_telemetry_for_coords(t_lat, t_lon, include_hourly=True)
+                    if live_city.get("success"):
+                        reg, loc_t, seas = infer_region_and_season(t_lat, t_alt)
+                        pred_c, pred_p, conf = predict_weather_with_ai(
+                            t_lat, t_lon, t_alt, live_city["tmp"], live_city["dpt"], live_city["rh"],
+                            live_city["wspd"], live_city["wdir"], live_city["precip"], live_city["slp"],
+                            live_city["uv"], live_city["vis"], live_city["cloud"], seas, loc_t, reg,
+                            wmo_cat=live_city["wmo_cat"]
+                        )
+                        c_rgba = WEATHER_COLOR_MAP.get(pred_c, [16, 185, 129, 235])
+                        st.session_state.custom_city_pin = {
+                            "key": t_name, "station_id": "LIVE-GEO", "station_name": t_name,
+                            "country": t_country, "flag": "📍", "lat": t_lat, "lon": t_lon, "alt": t_alt,
+                            "region": reg, "loc": loc_t, "season": seas,
+                            "tmp": round(live_city["tmp"], 1), "feels_like": round(live_city["feels_like"], 1),
+                            "dpt": round(live_city["dpt"], 1), "rh": live_city["rh"],
+                            "wspd": round(live_city["wspd"], 1), "wgust": round(live_city["wgust"], 1),
+                            "wdir": round(live_city["wdir"], 0), "slp": round(live_city["slp"], 1),
+                            "precip": round(live_city["precip"], 0), "uv": live_city["uv"],
+                            "vis": round(live_city["vis"], 1), "cloud": live_city["cloud"],
+                            "cloud_pct": live_city["cloud_pct"], "wmo_desc": live_city["wmo_desc"],
+                            "predicted_weather": pred_c, "weather_badge": WEATHER_BADGE_MAP.get(pred_c, pred_c),
+                            "map_label": f"📍 {t_name} • {live_city['tmp']:.0f}°C",
+                            "confidence": round(conf, 1), "color_rgba": c_rgba,
+                            "halo_rgba": [0, 255, 255, 95], "radius": 240000, "halo_radius": 450000,
+                            "col_elevation": max(80000.0, (live_city["tmp"] + 20.0) * 16000.0),
+                            "is_live": True, "live_ts": live_city["timestamp"],
+                            "hourly": live_city.get("hourly", {})
+                        }
+
+        # Display Custom Searched City Live Card & 96h Forecast if active
+        if st.session_state.custom_city_pin:
+            cp = st.session_state.custom_city_pin
+            with st.container(border=True):
+                cc1, cc2, cc3, cc4, cc5, cc6 = st.columns([1.4, 1, 1, 1, 1, 0.7])
+                cc1.markdown(f"### 📍 {cp['station_name']}, {cp['country']}\n**AI Forecast:** {cp['weather_badge']} (**{cp['confidence']}%**) • *WMO: {cp['wmo_desc']}*")
+                cc2.metric("Temperature", f"{cp['tmp']} °C", delta=f"Feels {cp['feels_like']} °C")
+                cc3.metric("Humidity & Dew", f"{cp['rh']}%", delta=f"Dew {cp['dpt']} °C")
+                cc4.metric("Wind & Gusts", f"{cp['wspd']} km/h", delta=f"Gusts {cp['wgust']} km/h")
+                cc5.metric("Pressure & Rain", f"{cp['slp']} hPa", delta=f"Rain Prob {cp['precip']:.0f}%")
+                with cc6:
+                    if st.button("✖ Clear Pin", use_container_width=True):
+                        st.session_state.custom_city_pin = None
+                        st.rerun()
+
+                # 96-Hour (4-Day) Live Forecast Chart for Searched City
+                hourly_data = cp.get("hourly", {})
+                if hourly_data and "time" in hourly_data:
+                    with st.expander(f"📈 View Live 96-Hour (4-Day) Temperature & Rain Probability Forecast for {cp['station_name']}", expanded=False):
+                        h_df = pd.DataFrame({
+                            "Time": pd.to_datetime(hourly_data["time"]),
+                            "Temperature (°C)": hourly_data["temperature_2m"],
+                            "Rain Probability (%)": hourly_data["precipitation_probability"]
+                        }).set_index("Time")
+                        st.line_chart(h_df, height=220)
 
         if not df_global.empty:
             # Telemetry Summary Metric Row
             k1, k2, k3, k4, k5 = st.columns(5)
             with k1:
-                st.metric("Monitored Observatories", f"{len(df_global)} Stations", delta="100% Live" if live_data_toggle else "Benchmark")
+                live_cnt = int(df_global["is_live"].sum())
+                st.metric("Monitored Observatories", f"{len(df_global)} Stations", delta=f"{live_cnt}/{len(df_global)} Live Synced" if live_data_toggle else "Benchmark")
             with k2:
                 avg_temp = df_global["tmp"].mean()
                 st.metric("Avg Global Temp", f"{avg_temp:.1f} °C", delta=f"{df_global['tmp'].max():.0f}° max / {df_global['tmp'].min():.0f}° min")
@@ -522,64 +754,140 @@ if app_mode == "🚀 Live Weather Prediction Website":
                 max_wspd_row = df_global.loc[df_global["wspd"].idxmax()]
                 st.metric("Peak Wind Gust", f"{max_wspd_row['wspd']:.0f} km/h", delta=f"{max_wspd_row['station_name']}")
 
-            # Map Legend & Mapbox Controls
-            col_legend, col_btn = st.columns([2.5, 1])
-            with col_legend:
-                st.markdown("""
-                <div style="display: flex; gap: 0.8rem; align-items: center; margin: 0.6rem 0 0.8rem 0; flex-wrap: wrap;">
-                    <span style="font-weight: 600; font-size: 0.9rem;">Map Legend:</span>
-                    <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #D97706; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.82rem;">☀️ Sunny (Amber)</span>
-                    <span style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284C7; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.82rem;">🌧️ Rainy (Blue)</span>
-                    <span style="background: rgba(107, 114, 128, 0.2); border: 1px solid #6B7280; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.82rem;">☁️ Cloudy (Gray)</span>
-                    <span style="background: rgba(147, 51, 234, 0.2); border: 1px solid #9333EA; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.82rem;">❄️ Snowy (Purple)</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with col_btn:
-                if st.button("🔄 Sync Live Satellite Telemetry Now", use_container_width=True):
+            # Map Style & Visual Layer Controls
+            ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([1.2, 1.1, 1.5, 1.0])
+            with ctrl1:
+                map_theme = st.selectbox("🗺️ Map Theme:", [
+                    "🌑 Dark Matter Radar",
+                    "🗺️ Voyager Terrain",
+                    "☀️ Positron Light"
+                ])
+                style_urls = {
+                    "🌑 Dark Matter Radar": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+                    "🗺️ Voyager Terrain": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+                    "☀️ Positron Light": "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+                }
+                selected_map_style = style_urls[map_theme]
+            with ctrl2:
+                weather_filter = st.selectbox("🌦️ Filter Weather:", ["All Weather States", "Sunny", "Rainy", "Cloudy", "Snowy"])
+            with ctrl3:
+                st.write("**Visual Map Layers:**")
+                lc1, lc2, lc3 = st.columns(3)
+                show_3d_cols = lc1.checkbox("3D Bars", value=True, help="3D extruded temperature columns")
+                show_halos = lc2.checkbox("Halos", value=True, help="Atmospheric precipitation halo rings")
+                show_labels = lc3.checkbox("Labels", value=True, help="City & live temperature labels")
+            with ctrl4:
+                st.write("")
+                if st.button("🔄 Sync Live Satellites", use_container_width=True):
                     st.cache_data.clear()
                     st.rerun()
 
-            # Filter Map by weather
-            weather_filter = st.selectbox("Filter Map by Weather State:", ["All Weather States", "Sunny", "Rainy", "Cloudy", "Snowy"])
-            filtered_df = df_global if weather_filter == "All Weather States" else df_global[df_global["predicted_weather"] == weather_filter]
+            # Legend
+            st.markdown("""
+            <div style="display: flex; gap: 0.8rem; align-items: center; margin: 0.2rem 0 0.6rem 0; flex-wrap: wrap;">
+                <span style="font-weight: 600; font-size: 0.88rem;">AI Classification Legend:</span>
+                <span style="background: rgba(245, 158, 11, 0.2); border: 1px solid #D97706; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">☀️ Sunny (Amber)</span>
+                <span style="background: rgba(2, 132, 199, 0.2); border: 1px solid #0284C7; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">🌧️ Rainy (Blue)</span>
+                <span style="background: rgba(107, 114, 128, 0.2); border: 1px solid #6B7280; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">☁️ Cloudy (Gray)</span>
+                <span style="background: rgba(147, 51, 234, 0.2); border: 1px solid #9333EA; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">❄️ Snowy (Purple)</span>
+                <span style="background: rgba(6, 182, 212, 0.2); border: 1px solid #06B6D4; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.8rem;">📍 Searched City Pin</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # Build PyDeck Layer
-            scatterplot_layer = pdk.Layer(
+            # Combine 28 stations + custom searched city pin if present
+            map_df = df_global if weather_filter == "All Weather States" else df_global[df_global["predicted_weather"] == weather_filter]
+            if st.session_state.custom_city_pin:
+                cp_row = {k: v for k, v in st.session_state.custom_city_pin.items() if k != "hourly"}
+                map_df = pd.concat([map_df, pd.DataFrame([cp_row])], ignore_index=True)
+
+            layers = []
+            if show_halos:
+                layers.append(pdk.Layer(
+                    "ScatterplotLayer",
+                    data=map_df,
+                    get_position=["lon", "lat"],
+                    get_fill_color="halo_rgba",
+                    get_radius="halo_radius",
+                    radius_min_pixels=12,
+                    radius_max_pixels=42,
+                    pickable=False,
+                ))
+
+            if show_3d_cols:
+                layers.append(pdk.Layer(
+                    "ColumnLayer",
+                    data=map_df,
+                    get_position=["lon", "lat"],
+                    get_elevation="col_elevation",
+                    elevation_scale=1,
+                    radius=110000,
+                    get_fill_color="color_rgba",
+                    pickable=True,
+                    auto_highlight=True,
+                ))
+
+            layers.append(pdk.Layer(
                 "ScatterplotLayer",
-                data=filtered_df,
+                data=map_df,
                 get_position=["lon", "lat"],
                 get_fill_color="color_rgba",
-                get_line_color=[255, 255, 255, 200],
-                line_width_min_pixels=1.5,
+                get_line_color=[255, 255, 255, 230],
+                line_width_min_pixels=2,
                 get_radius="radius",
                 radius_min_pixels=7,
-                radius_max_pixels=25,
+                radius_max_pixels=22,
                 pickable=True,
                 auto_highlight=True,
-            )
+            ))
 
-            # View State centered on equator / prime meridian
-            view_state = pdk.ViewState(
-                latitude=20.0,
-                longitude=15.0,
-                zoom=1.45,
-                pitch=20.0,
-                bearing=0
-            )
+            if show_labels:
+                text_color = [245, 245, 245, 235] if "Dark" in map_theme else [20, 20, 20, 235]
+                layers.append(pdk.Layer(
+                    "TextLayer",
+                    data=map_df,
+                    get_position=["lon", "lat"],
+                    get_text="map_label",
+                    get_size=12,
+                    get_color=text_color,
+                    get_alignment_baseline="'top'",
+                    get_pixel_offset=[0, 14],
+                    pickable=False,
+                ))
 
-            # Rich HTML Tooltip
+            # Center camera on searched city if active, else global view
+            if st.session_state.custom_city_pin:
+                view_state = pdk.ViewState(
+                    latitude=st.session_state.custom_city_pin["lat"],
+                    longitude=st.session_state.custom_city_pin["lon"],
+                    zoom=4.2,
+                    pitch=40.0 if show_3d_cols else 10.0,
+                    bearing=0
+                )
+            else:
+                view_state = pdk.ViewState(
+                    latitude=22.0,
+                    longitude=15.0,
+                    zoom=1.55,
+                    pitch=32.0 if show_3d_cols else 10.0,
+                    bearing=0
+                )
+
             tooltip = {
                 "html": """
-                <div style="background-color: #1F2937; color: white; padding: 10px 14px; border-radius: 8px; font-family: sans-serif; font-size: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                    <div style="font-size: 14px; font-weight: bold; margin-bottom: 4px; color: #60A5FA;">{flag} {station_name} ({station_id})</div>
-                    <div style="color: #9CA3AF; margin-bottom: 6px;">{country} • {region} • Elev: <b>{alt}m</b></div>
-                    <hr style="border: 0; border-top: 1px solid #374151; margin: 4px 0 6px 0;"/>
-                    <div style="font-size: 13px; font-weight: bold; color: #F59E0B; margin-bottom: 4px;">Predicted: {predicted_weather} ({confidence}%)</div>
-                    <div>🌡️ <b>Temp:</b> {tmp}°C | 💧 <b>Dewpoint:</b> {dpt}°C | <b>RH:</b> {rh}%</div>
-                    <div>⏲️ <b>Pressure:</b> {slp} hPa | 🌧️ <b>Precipitation:</b> {precip}%</div>
-                    <div>💨 <b>Wind:</b> {wspd} km/h @ {wdir}° | ☁️ <b>Cloud:</b> {cloud}</div>
+                <div style="background: rgba(17, 24, 39, 0.94); backdrop-filter: blur(8px); color: #F9FAFB; padding: 12px 16px; border-radius: 10px; border: 1px solid rgba(96, 165, 250, 0.4); font-family: system-ui, sans-serif; font-size: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.45); min-width: 240px;">
+                    <div style="font-size: 14px; font-weight: 700; margin-bottom: 3px; color: #60A5FA;">{flag} {station_name} ({station_id})</div>
+                    <div style="color: #9CA3AF; font-size: 11px; margin-bottom: 6px;">{country} • {region} • Elev: <b>{alt} m</b></div>
+                    <hr style="border: 0; border-top: 1px solid #374151; margin: 5px 0 7px 0;"/>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span style="font-size: 13px; font-weight: 700; color: #FBBF24;">AI: {predicted_weather} ({confidence}%)</span>
+                        <span style="font-size: 11px; color: #34D399;">WMO: {wmo_desc}</span>
+                    </div>
+                    <div>🌡️ <b>Temp:</b> {tmp}°C (Feels {feels_like}°C) | 💧 <b>Dew:</b> {dpt}°C</div>
+                    <div>💦 <b>Humidity:</b> {rh}% | 🌧️ <b>Rain Prob:</b> {precip}%</div>
+                    <div>⏲️ <b>Pressure:</b> {slp} hPa | ☁️ <b>Cloud:</b> {cloud_pct}% ({cloud})</div>
+                    <div>💨 <b>Wind:</b> {wspd} km/h (Gusts {wgust}) @ {wdir}°</div>
                     <div>☀️ <b>UV Index:</b> {uv} | 👁️ <b>Visibility:</b> {vis} km</div>
-                    <div style="font-size: 10px; color: #10B981; margin-top: 4px;">📡 Feed: {live_ts}</div>
+                    <div style="font-size: 10px; color: #10B981; margin-top: 6px; border-top: 1px solid #374151; padding-top: 4px;">📡 Satellite Sync: {live_ts}</div>
                 </div>
                 """,
                 "style": {"zIndex": "1000"}
@@ -587,28 +895,28 @@ if app_mode == "🚀 Live Weather Prediction Website":
 
             st.pydeck_chart(
                 pdk.Deck(
-                    layers=[scatterplot_layer],
+                    layers=layers,
                     initial_view_state=view_state,
                     tooltip=tooltip,
-                    map_style="light"
+                    map_style=selected_map_style
                 ),
                 use_container_width=True
             )
 
             st.write("---")
-            st.subheader("📋 Comprehensive Global Station Telemetry Table")
+            st.subheader("📋 Live Global Station Telemetry & AI Classification Matrix")
             display_cols = [
-                "flag", "station_name", "country", "alt", "tmp", "dpt", "rh", 
-                "slp", "wspd", "wdir", "precip", "uv", "vis", "cloud", "weather_badge", "confidence", "live_ts"
+                "flag", "station_name", "country", "alt", "tmp", "feels_like", "dpt", "rh", 
+                "slp", "wspd", "wgust", "precip", "cloud_pct", "wmo_desc", "weather_badge", "confidence", "live_ts"
             ]
             renamed_cols = {
-                "flag": "Flag", "station_name": "Station", "country": "Country", "alt": "Elevation (m)",
-                "tmp": "TMP (°C)", "dpt": "DPT (°C)", "rh": "RH (%)", "slp": "SLP (hPa)",
-                "wspd": "Wind (km/h)", "wdir": "Dir (°)", "precip": "Precip (%)", "uv": "UV",
-                "vis": "Vis (km)", "cloud": "Cloud Deck", "weather_badge": "Predicted State", "confidence": "Confidence (%)",
-                "live_ts": "Satellite Feed Time"
+                "flag": "Flag", "station_name": "Station", "country": "Country", "alt": "Elev (m)",
+                "tmp": "TMP (°C)", "feels_like": "Feels (°C)", "dpt": "DPT (°C)", "rh": "RH (%)", "slp": "SLP (hPa)",
+                "wspd": "Wind (km/h)", "wgust": "Gusts", "precip": "Rain Prob (%)", "cloud_pct": "Cloud (%)",
+                "wmo_desc": "WMO Observed", "weather_badge": "AI Prediction", "confidence": "Conf (%)",
+                "live_ts": "Local Sync Time"
             }
-            st.dataframe(filtered_df[display_cols].rename(columns=renamed_cols), use_container_width=True)
+            st.dataframe(map_df[display_cols].rename(columns=renamed_cols), use_container_width=True)
 
     # ---------------------------------------------------------------------
     # SUB-TAB 2: STATION TELEMETRY STUDIO & LIVE AI INFERENCE
@@ -629,7 +937,7 @@ if app_mode == "🚀 Live Weather Prediction Website":
             with col_live_btn:
                 if st.button("🛰️ Pull Live Real-Time Telemetry for Coordinates", use_container_width=True):
                     with st.spinner("Fetching live satellite telemetry from Open-Meteo..."):
-                        pulled = fetch_live_telemetry_for_coords(lat, lon)
+                        pulled = fetch_live_telemetry_for_coords(lat, lon, include_hourly=True)
                         if pulled.get("success"):
                             st.session_state.live_pull_data = pulled
                             st.success(f"✓ Synced live satellite telemetry at {pulled['timestamp']}!")
@@ -639,6 +947,7 @@ if app_mode == "🚀 Live Weather Prediction Website":
             with col_live_status:
                 if st.session_state.live_pull_data:
                     st.caption(f"🟢 **Live Feed:** `{st.session_state.live_pull_data['timestamp']}`")
+                    st.caption(f"🛰️ **WMO Ground Truth:** `{st.session_state.live_pull_data.get('wmo_desc', 'N/A')}`")
                 else:
                     st.caption("ℹ️ Using Station Preset Values")
 
@@ -671,42 +980,12 @@ if app_mode == "🚀 Live Weather Prediction Website":
             st.subheader("Inference & Multi-Horizon Projections")
             
             if artifacts_loaded:
-                row = {col: 0.0 for col in feature_cols}
-                row['Latitude'] = float(lat)
-                row['Longitude'] = float(lon)
-                row['Altitude (m)'] = float(altitude)
-                row['Temperature'] = float(temp)
-                row['Dewpoint'] = float(dpt)
-                row['Humidity'] = float(rh)
-                row['Wind Speed'] = float(wspd)
-                row['Wind Direction'] = float(wdir)
-                row['Precipitation (%)'] = float(precip)
-                row['Atmospheric Pressure'] = float(pressure)
-                row['UV Index'] = float(uv_index)
-                row['Visibility (km)'] = float(visibility)
-
-                cloud_col = f"Cloud Cover_{cloud_cover}"
-                if cloud_col in row:
-                    row[cloud_col] = 1.0
-
-                season_col = f"Season_{season}"
-                if season_col in row:
-                    row[season_col] = 1.0
-
-                loc_col = f"Location_{location}"
-                if loc_col in row:
-                    row[loc_col] = 1.0
-
-                reg_col = f"Region_{region}"
-                if reg_col in row:
-                    row[reg_col] = 1.0
-
-                input_df = pd.DataFrame([row])[feature_cols]
-                scaled_input = pd.DataFrame(scaler.transform(input_df), columns=feature_cols)
-                pred_idx = model.predict(scaled_input)[0]
-                pred_class = le.inverse_transform([pred_idx])[0]
-                pred_probs = model.predict_proba(scaled_input)[0]
-                confidence = pred_probs[pred_idx] * 100.0
+                wmo_cat_live = st.session_state.live_pull_data.get("wmo_cat") if st.session_state.live_pull_data else None
+                pred_class, pred_probs, confidence = predict_weather_with_ai(
+                    lat, lon, altitude, temp, dpt, rh, wspd, wdir, precip,
+                    pressure, uv_index, visibility, cloud_cover, season, location, region,
+                    wmo_cat=wmo_cat_live
+                )
 
                 weather_cards = {
                     "Sunny": {"icon": "☀️", "color": "#D97706", "bg": "rgba(245, 158, 11, 0.1)", "desc": "High thermal insolation and elevated solar radiance with large dewpoint depression."},
