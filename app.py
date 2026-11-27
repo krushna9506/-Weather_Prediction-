@@ -1,11 +1,10 @@
 """
 SkyCast AI - Dark Bento Weather Intelligence & Global Radar Platform
 Clean, modern UI with Top Menu Bar, Live Open-Meteo Satellite Telemetry,
-Browser GPS + IP Location Detection, 3D PyDeck Radar Map & AI Forecasting.
+TimesFM 3.0 (1.23 GB Hugging Face), 3D PyDeck Radar Map & Exam Rubric.
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 import joblib
@@ -26,152 +25,162 @@ st.set_page_config(
 )
 
 # =========================================================================
-# DARK BENTO UI THEME & CUSTOM CSS (Aligned with Modern Weather Dashboard)
+# DARK BENTO UI THEME & CUSTOM CSS
 # =========================================================================
 st.markdown("""
 <style>
-    /* Global Dark Canvas */
     .stApp {
         background-color: #0B0D12;
         color: #F3F4F6;
     }
     .block-container {
-        padding-top: 1rem;
+        padding-top: 1.1rem;
         padding-bottom: 1.5rem;
-        max-width: 1400px;
+        max-width: 1380px;
     }
-    /* Hide default Streamlit header clutter */
     header[data-testid="stHeader"] {
         background: transparent;
-        height: 0.5rem;
+        height: 0.4rem;
     }
-    /* Top Menu Bar */
+    #MainMenu, footer {
+        visibility: hidden;
+    }
+    /* Brand Header */
     .top-brand {
-        font-size: 1.35rem;
+        font-size: 1.45rem;
         font-weight: 700;
         color: #F9FAFB;
         letter-spacing: -0.4px;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+        line-height: 1.2;
     }
     .top-sub {
         font-size: 0.8rem;
         color: #9CA3AF;
-        margin-top: -2px;
+        margin-top: 2px;
     }
     /* Bento Cards */
     .bento-card {
         background: #151821;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 18px;
         padding: 1.25rem;
-        margin-bottom: 0.9rem;
+        margin-bottom: 0.85rem;
     }
-    .bento-card-sm {
+    .bento-row1 {
         background: #151821;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 16px;
         padding: 1rem 1.15rem;
-        height: 100%;
+        height: 172px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 0.85rem;
+    }
+    .bento-row2 {
+        background: #151821;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 16px;
+        padding: 0.95rem 1.15rem;
+        height: 98px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .bento-title {
-        font-size: 0.88rem;
+        font-size: 0.86rem;
         font-weight: 600;
         color: #D1D5DB;
-        margin-bottom: 0.65rem;
     }
     .hero-temp {
-        font-size: 3.4rem;
+        font-size: 3.3rem;
         font-weight: 700;
         color: #FFFFFF;
         line-height: 1;
         letter-spacing: -1.5px;
     }
     .hero-cond {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         font-weight: 500;
-        color: #D1D5DB;
+        color: #E5E7EB;
     }
     .ai-pill {
-        background: rgba(245, 158, 11, 0.15);
+        background: rgba(245, 158, 11, 0.16);
         border: 1px solid rgba(245, 158, 11, 0.45);
         color: #FBBF24;
-        padding: 0.22rem 0.65rem;
+        padding: 0.2rem 0.6rem;
         border-radius: 9999px;
-        font-size: 0.75rem;
+        font-size: 0.74rem;
         font-weight: 600;
         display: inline-block;
+        margin-top: 4px;
     }
     .live-dot {
         background: rgba(16, 185, 129, 0.15);
         border: 1px solid rgba(16, 185, 129, 0.4);
         color: #34D399;
-        padding: 0.22rem 0.65rem;
+        padding: 0.2rem 0.6rem;
         border-radius: 9999px;
-        font-size: 0.75rem;
+        font-size: 0.74rem;
         font-weight: 600;
         display: inline-block;
     }
-    /* 7-Day Forecast Cards */
+    /* 7-Day Forecast Strip */
     .day-card {
         background: #151821;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 16px;
-        padding: 0.85rem 0.4rem;
+        padding: 0.85rem 0.35rem;
         text-align: center;
+        height: 126px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
     }
     .day-card-active {
         background: #1C212E;
-        border: 1px solid rgba(245, 158, 11, 0.45);
+        border: 1px solid rgba(245, 158, 11, 0.55);
         border-radius: 16px;
-        padding: 0.85rem 0.4rem;
+        padding: 0.85rem 0.35rem;
         text-align: center;
+        height: 126px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
     }
-    .day-name {
-        font-size: 0.82rem;
-        color: #9CA3AF;
-        font-weight: 600;
-    }
-    .day-icon {
-        font-size: 1.85rem;
-        margin: 0.45rem 0;
-    }
-    .day-temp {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #F9FAFB;
-    }
-    /* Map Promo Card */
+    .day-name { font-size: 0.82rem; color: #9CA3AF; font-weight: 600; }
+    .day-icon { font-size: 1.8rem; line-height: 1; }
+    .day-temp { font-size: 1.05rem; font-weight: 700; color: #F9FAFB; }
     .map-promo {
         background: linear-gradient(135deg, #1E293B 0%, #0F172A 60%, #1E1B4B 100%);
         border: 1px solid rgba(96, 165, 250, 0.25);
-        border-radius: 18px;
-        padding: 1.25rem;
+        border-radius: 16px;
+        padding: 1rem 1.15rem;
         text-align: center;
+        margin-bottom: 0.5rem;
     }
-    /* Menu Radio Styling */
-    div[data-testid="stRadio"] > div {
-        flex-direction: row;
-        gap: 0.4rem;
-    }
-    div[data-testid="stRadio"] label {
-        background: #151821;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        padding: 0.4rem 0.9rem !important;
-        cursor: pointer;
-    }
-    /* Overview Metric Large Value */
-    .ov-val {
-        font-size: 1.65rem;
+    .ov-val { font-size: 1.6rem; font-weight: 700; color: #F9FAFB; line-height: 1.1; }
+    .ov-sub { font-size: 0.76rem; color: #9CA3AF; }
+    /* Styled Primary/Secondary Menu Buttons */
+    div[data-testid="stButton"] > button[kind="primary"] {
+        background: linear-gradient(135deg, #F59E0B, #D97706);
+        color: #0B0D12;
+        border: none;
         font-weight: 700;
-        color: #F9FAFB;
-        line-height: 1.1;
+        border-radius: 10px;
     }
-    .ov-sub {
-        font-size: 0.78rem;
-        color: #9CA3AF;
+    div[data-testid="stButton"] > button[kind="secondary"] {
+        background: #151821;
+        color: #D1D5DB;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+        border-radius: 10px;
+    }
+    div[data-testid="stButton"] > button[kind="secondary"]:hover {
+        border-color: rgba(245, 158, 11, 0.5);
+        color: #FBBF24;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -241,12 +250,7 @@ WEATHER_COLOR_MAP = {
     "Snowy": [168, 85, 247, 225],
 }
 
-WEATHER_ICON_MAP = {
-    "Sunny": "☀️",
-    "Rainy": "🌧️",
-    "Cloudy": "⛅",
-    "Snowy": "❄️",
-}
+WEATHER_ICON_MAP = {"Sunny": "☀️", "Rainy": "🌧️", "Cloudy": "⛅", "Snowy": "❄️"}
 
 WMO_CODE_MAP = {
     0: ("Clear Sky", "Sunny", "☀️"),
@@ -328,17 +332,6 @@ def detect_location_via_ip():
             continue
     return {"success": False, "lat": 18.52, "lon": 73.85, "city": "Pune", "country": "India"}
 
-@st.cache_data(ttl=600, show_spinner=False)
-def reverse_geocode_coords(lat: float, lon: float):
-    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'SkyCastAI/4.0'}), timeout=4.0) as r:
-            addr = json.loads(r.read().decode('utf-8')).get("address", {})
-            city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("state_district") or addr.get("state") or "My Location"
-            return city, addr.get("country", "")
-    except Exception:
-        return f"GPS ({lat:.2f}, {lon:.2f})", ""
-
 @st.cache_data(ttl=180, show_spinner=False)
 def fetch_live_telemetry_for_coords(lat: float, lon: float, include_full_forecast: bool = False):
     forecast_params = "&hourly=temperature_2m,precipitation_probability,surface_pressure,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&forecast_days=7" if include_full_forecast else "&hourly=precipitation_probability&forecast_days=1"
@@ -371,7 +364,7 @@ def fetch_live_telemetry_for_coords(lat: float, lon: float, include_full_forecas
             precip_probs = hourly.get('precipitation_probability', [])
             precip_pct = float(precip_probs[0]) if (precip_probs and precip_probs[0] is not None) else float(min(100.0, cur.get('precipitation', 0.0) * 25.0))
 
-            res = {
+            return {
                 "success": True,
                 "tmp": float(cur.get('temperature_2m', 20.0)),
                 "feels_like": float(cur.get('apparent_temperature', cur.get('temperature_2m', 20.0))),
@@ -394,7 +387,6 @@ def fetch_live_telemetry_for_coords(lat: float, lon: float, include_full_forecas
                 "hourly": hourly,
                 "daily": daily,
             }
-            return res
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -484,41 +476,39 @@ def get_global_station_telemetry_df():
         return pd.DataFrame(list(executor.map(fetch_station, GLOBAL_WEATHER_STATIONS.items())))
 
 # =========================================================================
-# SVG VISUALIZERS FOR BENTO CARDS (Matches Dark Reference Template)
+# SVG VISUALIZERS FOR BENTO CARDS
 # =========================================================================
 def render_temp_curve_svg(temps_4):
-    """Renders smooth amber diurnal temperature curve (Morning, Afternoon, Evening, Night)."""
     t_min, t_max = min(temps_4), max(temps_4)
     span = max(t_max - t_min, 2.0)
-    ys = [48 - ((t - t_min) / span) * 28 for t in temps_4]
+    ys = [46 - ((t - t_min) / span) * 26 for t in temps_4]
     xs = [30, 105, 180, 255]
     return f"""
-    <svg viewBox="0 0 285 88" width="100%" height="92">
+    <svg viewBox="0 0 285 88" width="100%" height="90">
         <defs>
             <linearGradient id="tempGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.35"/>
                 <stop offset="100%" stop-color="#F59E0B" stop-opacity="0.0"/>
             </linearGradient>
         </defs>
-        <path d="M {xs[0]},{ys[0]} C 65,{ys[0]} 70,{ys[1]} {xs[1]},{ys[1]} C 140,{ys[1]} 145,{ys[2]} {xs[2]},{ys[2]} C 215,{ys[2]} 220,{ys[3]} {xs[3]},{ys[3]} L {xs[3]},65 L {xs[0]},65 Z" fill="url(#tempGrad)"/>
+        <path d="M {xs[0]},{ys[0]} C 65,{ys[0]} 70,{ys[1]} {xs[1]},{ys[1]} C 140,{ys[1]} 145,{ys[2]} {xs[2]},{ys[2]} C 215,{ys[2]} 220,{ys[3]} {xs[3]},{ys[3]} L {xs[3]},62 L {xs[0]},62 Z" fill="url(#tempGrad)"/>
         <path d="M {xs[0]},{ys[0]} C 65,{ys[0]} 70,{ys[1]} {xs[1]},{ys[1]} C 140,{ys[1]} 145,{ys[2]} {xs[2]},{ys[2]} C 215,{ys[2]} 220,{ys[3]} {xs[3]},{ys[3]}" fill="none" stroke="#F59E0B" stroke-width="2.4" stroke-linecap="round"/>
         <circle cx="{xs[0]}" cy="{ys[0]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
         <circle cx="{xs[1]}" cy="{ys[1]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
         <circle cx="{xs[2]}" cy="{ys[2]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
         <circle cx="{xs[3]}" cy="{ys[3]}" r="3.5" fill="#FBBF24" stroke="#151821" stroke-width="1.5"/>
-        <text x="{xs[0]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Morning</text>
-        <text x="{xs[1]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Afternoon</text>
-        <text x="{xs[2]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Evening</text>
-        <text x="{xs[3]}" y="76" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Night</text>
-        <text x="{xs[0]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[0]:.0f}°</text>
-        <text x="{xs[1]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[1]:.0f}°</text>
-        <text x="{xs[2]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[2]:.0f}°</text>
-        <text x="{xs[3]}" y="87" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[3]:.0f}°</text>
+        <text x="{xs[0]}" y="74" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Morning</text>
+        <text x="{xs[1]}" y="74" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Afternoon</text>
+        <text x="{xs[2]}" y="74" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Evening</text>
+        <text x="{xs[3]}" y="74" fill="#9CA3AF" font-size="9.5" text-anchor="middle">Night</text>
+        <text x="{xs[0]}" y="86" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[0]:.0f}°</text>
+        <text x="{xs[1]}" y="86" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[1]:.0f}°</text>
+        <text x="{xs[2]}" y="86" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[2]:.0f}°</text>
+        <text x="{xs[3]}" y="86" fill="#F3F4F6" font-size="10" font-weight="600" text-anchor="middle">{temps_4[3]:.0f}°</text>
     </svg>
     """
 
 def render_wind_bars_svg(wind_series):
-    """Renders amber vertical bar-spike chart for Wind Status card."""
     vals = wind_series[:18] if len(wind_series) >= 18 else [8, 10, 12, 14, 11, 15, 18, 22, 19, 16, 14, 12, 10, 9, 11, 13, 12, 10]
     w_max = max(max(vals), 5.0)
     bars = []
@@ -531,16 +521,13 @@ def render_wind_bars_svg(wind_series):
     return f'<svg viewBox="0 0 260 54" width="100%" height="58">{"".join(bars)}</svg>'
 
 def render_uv_gauge_svg(uv_val):
-    """Renders semi-circular amber UV Index arc gauge (0–12)."""
     clamped = min(max(uv_val, 0.0), 12.0)
-    pct = clamped / 12.0
-    arc_len = 157.0  # pi * r where r=50
-    dash = pct * arc_len
+    dash = (clamped / 12.0) * 157.0
     return f"""
-    <svg viewBox="0 0 140 76" width="100%" height="76">
+    <svg viewBox="0 0 140 76" width="100%" height="74">
         <path d="M 20,66 A 50,50 0 0,1 120,66" fill="none" stroke="#262B38" stroke-width="11" stroke-linecap="round"/>
         <path d="M 20,66 A 50,50 0 0,1 120,66" fill="none" stroke="#F59E0B" stroke-width="11" stroke-linecap="round"
-              stroke-dasharray="{dash:.1f} {arc_len:.1f}"/>
+              stroke-dasharray="{dash:.1f} 157.0"/>
         <text x="70" y="63" fill="#F9FAFB" font-size="16" font-weight="700" text-anchor="middle">{uv_val:.1f} <tspan font-size="10" fill="#9CA3AF">UV</tspan></text>
     </svg>
     """
@@ -552,91 +539,74 @@ if "active_location" not in st.session_state:
     ip_loc = detect_location_via_ip()
     st.session_state.active_location = {
         "lat": ip_loc["lat"], "lon": ip_loc["lon"],
-        "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "IP Auto-Detect"
+        "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "Auto IP"
     }
 
 if "nav_page" not in st.session_state:
     st.session_state.nav_page = "🏠 Dashboard"
 
-# Handle Browser GPS Redirect (?my_lat=...&my_lon=...)
-qp = st.query_params
-if "my_lat" in qp and "my_lon" in qp:
-    try:
-        g_lat, g_lon = float(qp["my_lat"]), float(qp["my_lon"])
-        g_city, g_country = reverse_geocode_coords(g_lat, g_lon)
-        st.session_state.active_location = {
-            "lat": g_lat, "lon": g_lon, "city": g_city, "country": g_country, "alt": 50.0, "source": "Browser GPS"
-        }
-        st.query_params.clear()
-    except Exception:
-        st.query_params.clear()
+if "search_error" not in st.session_state:
+    st.session_state.search_error = ""
 
 # =========================================================================
-# TOP MENU BAR & QUICK LOCATION CONTROLS
+# TOP HEADER + PROPER HORIZONTAL MENU BAR
 # =========================================================================
-m_col1, m_col2, m_col3 = st.columns([1.4, 2.8, 1.3])
-with m_col1:
+h_left, h_mid, h_right = st.columns([1.5, 2.6, 0.9], gap="small")
+with h_left:
     today_str = datetime.datetime.now().strftime("%A, %b %d, %Y")
     st.markdown(f"""
     <div class="top-brand">🌤️ SkyCast AI</div>
-    <div class="top-sub">{today_str} • WEATHER-5K Live</div>
+    <div class="top-sub">{today_str} • {st.session_state.active_location['city']}</div>
     """, unsafe_allow_html=True)
 
-with m_col2:
-    pages = ["🏠 Dashboard", "🗺️ Radar Map", "🎛️ AI Simulator", "📊 Analytics", "🎓 Exam Rubric"]
-    selected_page = st.radio(
-        "Menu", pages,
-        index=pages.index(st.session_state.nav_page),
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-    st.session_state.nav_page = selected_page
+with h_mid:
+    with st.form("city_search_form", clear_on_submit=False, border=False):
+        f_col1, f_col2 = st.columns([3.2, 1.0])
+        with f_col1:
+            city_q = st.text_input("Search", placeholder="🔍 Type any city (Pune, London, Tokyo, New York) & press Enter...", label_visibility="collapsed")
+        with f_col2:
+            submitted = st.form_submit_button("Search", type="primary", width="stretch")
+        if submitted and city_q.strip():
+            matches = search_city_geocoding(city_q)
+            if matches:
+                t = matches[0]
+                st.session_state.active_location = {
+                    "lat": float(t["latitude"]), "lon": float(t["longitude"]),
+                    "city": t["name"], "country": t.get("country", ""),
+                    "alt": float(t.get("elevation", 50.0) or 50.0), "source": "City Search"
+                }
+                st.session_state.search_error = ""
+                st.session_state.pop("timesfm_res", None)
+                st.rerun()
+            else:
+                st.session_state.search_error = f"City '{city_q}' not found."
 
-with m_col3:
-    b1, b2 = st.columns(2)
-    with b1:
-        components.html("""
-        <button onclick="getGPS()" style="
-            width:100%; padding:0.42rem 0.4rem; border-radius:9px; border:1px solid rgba(245,158,11,0.4);
-            background:#151821; color:#FBBF24; font-weight:600; font-size:0.78rem; cursor:pointer;
-        ">📍 My GPS</button>
-        <script>
-        function getGPS(){
-            if(!navigator.geolocation) return;
-            navigator.geolocation.getCurrentPosition((p)=>{
-                const u = new URL(window.top.location.href);
-                u.searchParams.set('my_lat', p.coords.latitude.toFixed(5));
-                u.searchParams.set('my_lon', p.coords.longitude.toFixed(5));
-                window.top.location.href = u.toString();
-            });
+with h_right:
+    if st.button("📍 My Location", type="secondary", width="stretch", help="Detect my current location automatically"):
+        st.cache_data.clear()
+        ip_loc = detect_location_via_ip()
+        st.session_state.active_location = {
+            "lat": ip_loc["lat"], "lon": ip_loc["lon"],
+            "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "Auto IP"
         }
-        </script>
-        """, height=38)
-    with b2:
-        if st.button("🌐 Auto IP", use_container_width=True):
-            ip_loc = detect_location_via_ip()
-            st.session_state.active_location = {
-                "lat": ip_loc["lat"], "lon": ip_loc["lon"],
-                "city": ip_loc["city"], "country": ip_loc["country"], "alt": 50.0, "source": "IP Auto-Detect"
-            }
+        st.session_state.search_error = ""
+        st.session_state.pop("timesfm_res", None)
+        st.rerun()
+
+if st.session_state.search_error:
+    st.warning(st.session_state.search_error)
+
+# Clean Horizontal Menu Bar (5 Equal Pill Buttons - Zero Wrapping)
+pages = ["🏠 Dashboard", "🗺️ Radar Map", "🎛️ AI Simulator", "📊 Analytics", "🎓 Exam Rubric"]
+nav_cols = st.columns(len(pages), gap="small")
+for idx, p_name in enumerate(pages):
+    with nav_cols[idx]:
+        btn_type = "primary" if st.session_state.nav_page == p_name else "secondary"
+        if st.button(p_name, key=f"nav_btn_{idx}", type=btn_type, width="stretch"):
+            st.session_state.nav_page = p_name
             st.rerun()
 
-# Compact Search Bar
-sc1, sc2, sc3 = st.columns([2.2, 1.5, 0.7])
-with sc1:
-    city_q = st.text_input("Search", placeholder="🔍 Search any city worldwide (e.g., Pune, London, Tokyo, New York, Zermatt)...", label_visibility="collapsed")
-with sc2:
-    matches = search_city_geocoding(city_q) if city_q else []
-    sel_idx = st.selectbox("Matches", range(len(matches)), format_func=lambda i: f"{matches[i]['name']}, {matches[i].get('country', '')}", label_visibility="collapsed") if matches else None
-with sc3:
-    if st.button("Go", use_container_width=True, disabled=(sel_idx is None)):
-        t = matches[sel_idx]
-        st.session_state.active_location = {
-            "lat": float(t["latitude"]), "lon": float(t["longitude"]),
-            "city": t["name"], "country": t.get("country", ""),
-            "alt": float(t.get("elevation", 50.0) or 50.0), "source": "City Search"
-        }
-        st.rerun()
+st.markdown('<hr style="border:0; border-top:1px solid rgba(255,255,255,0.07); margin:0.45rem 0 0.9rem 0;">', unsafe_allow_html=True)
 
 # Fetch Live Data for Active Location
 act = st.session_state.active_location
@@ -653,7 +623,7 @@ else:
     pred_class, confidence = "Sunny", 95.0
 
 # =========================================================================
-# PAGE 1: DASHBOARD (EXACT DARK BENTO TEMPLATE)
+# PAGE 1: DASHBOARD (DARK BENTO TEMPLATE)
 # =========================================================================
 if st.session_state.nav_page == "🏠 Dashboard":
     if not live.get("success"):
@@ -661,7 +631,7 @@ if st.session_state.nav_page == "🏠 Dashboard":
     else:
         col_left, col_right = st.columns([1.05, 2.35], gap="medium")
 
-        # --- LEFT COLUMN: HERO CARD + DIURNAL CURVE + MAP PROMO ---
+        # --- LEFT COLUMN ---
         with col_left:
             icon = live.get("wmo_icon") or WEATHER_ICON_MAP.get(pred_class, "⛅")
             st.markdown(f"""
@@ -669,12 +639,12 @@ if st.session_state.nav_page == "🏠 Dashboard":
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
                         <div style="font-size:1.25rem; font-weight:700; color:#F9FAFB;">{act['city']}</div>
-                        <div style="font-size:0.82rem; color:#9CA3AF;">{act['country']} • {act['source']}</div>
+                        <div style="font-size:0.8rem; color:#9CA3AF;">{act['country']} • {act['source']}</div>
                     </div>
                     <span class="live-dot">● LIVE</span>
                 </div>
-                <div style="margin: 1.1rem 0 0.6rem 0; font-size: 3.2rem; line-height: 1;">{icon}</div>
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:0.5rem;">
+                <div style="margin: 1rem 0 0.5rem 0; font-size: 3.1rem; line-height: 1;">{icon}</div>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:0.4rem;">
                     <div class="hero-temp">{live['tmp']:.0f}° C</div>
                     <div style="text-align:right;">
                         <div class="hero-cond">{live['wmo_desc']}</div>
@@ -684,12 +654,8 @@ if st.session_state.nav_page == "🏠 Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-            # Diurnal Temperature Card (Morning, Afternoon, Evening, Night)
             h_temps = live.get("hourly", {}).get("temperature_2m", [])
-            if len(h_temps) >= 24:
-                t_4 = [h_temps[6], h_temps[13], h_temps[18], h_temps[22]]
-            else:
-                t_4 = [live["tmp"] - 3, live["tmp"] + 2, live["tmp"], live["tmp"] - 4]
+            t_4 = [h_temps[6], h_temps[13], h_temps[18], h_temps[22]] if len(h_temps) >= 24 else [live["tmp"] - 3, live["tmp"] + 2, live["tmp"], live["tmp"] - 4]
 
             st.markdown(f"""
             <div class="bento-card">
@@ -698,22 +664,20 @@ if st.session_state.nav_page == "🏠 Dashboard":
             </div>
             """, unsafe_allow_html=True)
 
-            # Map Promo Card
             st.markdown("""
             <div class="map-promo">
-                <div style="font-size:0.95rem; font-weight:600; color:#E5E7EB; margin-bottom:0.5rem;">
-                    Explore global 3D map of wind, weather & live stations.
+                <div style="font-size:0.92rem; font-weight:600; color:#E5E7EB; margin-bottom:0.35rem;">
+                    Global 3D Weather & Wind Radar
                 </div>
-                <div style="font-size:0.78rem; color:#9CA3AF;">28 Global Observatories • Live Satellite Radar</div>
+                <div style="font-size:0.76rem; color:#9CA3AF;">28 Live Observatories Worldwide</div>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("🗺️ Open Global Radar Map", use_container_width=True):
+            if st.button("🗺️ Open Global Radar Map", key="dash_open_map", type="primary", width="stretch"):
                 st.session_state.nav_page = "🗺️ Radar Map"
                 st.rerun()
 
-        # --- RIGHT COLUMN: 7-DAY STRIP + TODAY'S OVERVIEW BENTO GRID ---
+        # --- RIGHT COLUMN ---
         with col_right:
-            # 7-Day Forecast Strip
             daily = live.get("daily", {})
             d_times = daily.get("time", [])
             d_codes = daily.get("weather_code", [])
@@ -735,18 +699,17 @@ if st.session_state.nav_page == "🏠 Dashboard":
                         </div>
                         """, unsafe_allow_html=True)
 
-            st.markdown('<div style="font-size:1.05rem; font-weight:700; color:#F9FAFB; margin: 1rem 0 0.6rem 0;">Today\'s overview</div>', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:1.05rem; font-weight:700; color:#F9FAFB; margin: 0.95rem 0 0.55rem 0;">Today\'s overview</div>', unsafe_allow_html=True)
 
-            # Row 1: Wind Status | UV Index | Sunrise & Sunset
             ov1, ov2, ov3 = st.columns(3, gap="small")
             h_winds = live.get("hourly", {}).get("wind_speed_10m", [])
             with ov1:
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row1">
                     <div class="bento-title">Wind Status</div>
                     {render_wind_bars_svg(h_winds)}
-                    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:0.4rem;">
-                        <span class="ov-val">{live['wspd']:.1f} <span style="font-size:0.85rem; color:#9CA3AF;">km/h</span></span>
+                    <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span class="ov-val">{live['wspd']:.1f} <span style="font-size:0.82rem; color:#9CA3AF;">km/h</span></span>
                         <span class="ov-sub">Gusts {live['wgust']:.0f} km/h</span>
                     </div>
                 </div>
@@ -754,68 +717,66 @@ if st.session_state.nav_page == "🏠 Dashboard":
 
             with ov2:
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row1">
                     <div class="bento-title">UV Index</div>
                     {render_uv_gauge_svg(live['uv'])}
-                    <div class="ov-sub" style="text-align:center;">{"High solar radiation" if live["uv"] >= 6 else "Low/Moderate UV"}</div>
+                    <div class="ov-sub" style="text-align:center;">{"High solar radiation" if live["uv"] >= 6 else "Low / Moderate UV"}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with ov3:
-                sr_raw = daily.get("sunrise", ["2026-11-26T06:32"])[0]
-                ss_raw = daily.get("sunset", ["2026-11-26T17:42"])[0]
+                sr_raw = daily.get("sunrise", ["2026-11-27T06:32"])[0]
+                ss_raw = daily.get("sunset", ["2026-11-27T17:42"])[0]
                 sr_str = datetime.datetime.fromisoformat(sr_raw).strftime("%I:%M %p")
                 ss_str = datetime.datetime.fromisoformat(ss_raw).strftime("%I:%M %p")
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row1">
                     <div class="bento-title">Sunrise and sunset</div>
-                    <div style="display:flex; align-items:center; gap:0.8rem; margin: 0.65rem 0;">
-                        <span style="font-size:1.5rem;">🌅</span>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <span style="font-size:1.4rem;">🌅</span>
                         <div>
                             <div class="ov-sub">Sunrise</div>
-                            <div style="font-size:1.05rem; font-weight:700; color:#F9FAFB;">{sr_str}</div>
+                            <div style="font-size:1.0rem; font-weight:700; color:#F9FAFB;">{sr_str}</div>
                         </div>
                     </div>
-                    <div style="display:flex; align-items:center; gap:0.8rem;">
-                        <span style="font-size:1.5rem;">🌇</span>
+                    <div style="display:flex; align-items:center; gap:0.75rem;">
+                        <span style="font-size:1.4rem;">🌇</span>
                         <div>
                             <div class="ov-sub">Sunset</div>
-                            <div style="font-size:1.05rem; font-weight:700; color:#F9FAFB;">{ss_str}</div>
+                            <div style="font-size:1.0rem; font-weight:700; color:#F9FAFB;">{ss_str}</div>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.write("")
-            # Row 2: Humidity | Visibility | Feels Like
             ov4, ov5, ov6 = st.columns(3, gap="small")
             with ov4:
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row2">
                     <div class="bento-title">Humidity</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span class="ov-val">{live['rh']}%</span>
-                        <span class="ov-sub">💧 Dew point is {live['dpt']:.0f}° right now</span>
+                        <span class="ov-sub">💧 Dew point {live['dpt']:.0f}°</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with ov5:
-                vis_note = "Clear atmospheric sight" if live["vis"] >= 10 else "Haze affecting visibility"
+                vis_note = "Clear sight" if live["vis"] >= 10 else "Haze present"
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row2">
                     <div class="bento-title">Visibility</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span class="ov-val">{live['vis']:.0f} <span style="font-size:0.85rem; color:#9CA3AF;">km</span></span>
+                        <span class="ov-val">{live['vis']:.0f} <span style="font-size:0.82rem; color:#9CA3AF;">km</span></span>
                         <span class="ov-sub">👁️ {vis_note}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with ov6:
-                feel_note = "Warm thermal index" if live["feels_like"] >= 26 else ("Cool breeze" if live["feels_like"] <= 15 else "Comfortable")
+                feel_note = "Warm index" if live["feels_like"] >= 26 else ("Cool breeze" if live["feels_like"] <= 15 else "Comfortable")
                 st.markdown(f"""
-                <div class="bento-card-sm">
+                <div class="bento-row2">
                     <div class="bento-title">Feels like</div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span class="ov-val">{live['feels_like']:.0f}°</span>
@@ -823,52 +784,6 @@ if st.session_state.nav_page == "🏠 Dashboard":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-        # --- HUGGING FACE TIMESFM 3.0 (1.23 GB) NEURAL FORECAST PANEL ---
-        st.write("")
-        tf_h1, tf_h2 = st.columns([2.2, 1])
-        with tf_h1:
-            st.markdown('<div style="font-size:1.0rem; font-weight:700; color:#F9FAFB;">🧠 TimesFM 3.0 Neural Weather Forecast <span class="ai-pill">Hugging Face • 1.23 GB</span></div>', unsafe_allow_html=True)
-        with tf_h2:
-            run_tf = st.button("⚡ Run TimesFM 3.0 (24h Forecast)", use_container_width=True)
-
-        if "timesfm_cache" not in st.session_state:
-            st.session_state.timesfm_cache = {}
-
-        loc_key = f"{act['lat']:.2f},{act['lon']:.2f}"
-        if run_tf:
-            with st.spinner("Running google/timesfm-3.0-pytorch (1.23 GB) on live 7-day telemetry..."):
-                try:
-                    from src.hf_weather_forecaster import forecast_24h_with_timesfm
-                    st.session_state.timesfm_cache[loc_key] = forecast_24h_with_timesfm(act["lat"], act["lon"])
-                except Exception as e:
-                    st.error(f"TimesFM 3.0 error: {e}")
-
-        if loc_key in st.session_state.timesfm_cache:
-            tf_res = st.session_state.timesfm_cache[loc_key]
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Model", "TimesFM 3.0", delta="1.23 GB (HF)")
-            m2.metric("Live 24h MAE", f"{tf_res['live_24h_mae']} °C", delta="Zero-Shot")
-            m3.metric("Next +6h Temp", f"{tf_res['forecast_24h'][5]:.1f} °C")
-            m4.metric("Next +24h Temp", f"{tf_res['forecast_24h'][23]:.1f} °C")
-
-            fig_tf, ax_tf = plt.subplots(figsize=(9, 2.5), facecolor="#151821")
-            ax_tf.set_facecolor("#151821")
-            hist = tf_res["history_temps"]
-            fc = tf_res["forecast_24h"]
-            x_hist = np.arange(-len(hist) + 1, 1)
-            x_fc = np.arange(1, len(fc) + 1)
-            ax_tf.plot(x_hist, hist, color="#9CA3AF", lw=1.8, label="Observed (Past 48h)")
-            ax_tf.plot(x_fc, fc, color="#F59E0B", lw=2.3, label="TimesFM 3.0 Median (+24h)")
-            ax_tf.fill_between(x_fc, tf_res["p10"], tf_res["p90"], color="#F59E0B", alpha=0.18, label="P10–P90 Band")
-            ax_tf.axvline(0, color="#374151", linestyle="--", lw=1)
-            ax_tf.set_ylabel("Temp (°C)", color="#9CA3AF", fontsize=8)
-            ax_tf.set_xlabel("Hours Relative to Now (0h)", color="#9CA3AF", fontsize=8)
-            ax_tf.tick_params(colors="#9CA3AF", labelsize=7)
-            ax_tf.legend(facecolor="#151821", edgecolor="none", labelcolor="#D1D5DB", fontsize=7.5, loc="upper left")
-            ax_tf.grid(True, linestyle=":", alpha=0.2)
-            st.pyplot(fig_tf, use_container_width=True)
-            plt.close(fig_tf)
 
 # =========================================================================
 # PAGE 2: 3D/2D GLOBAL RADAR MAP
@@ -885,7 +800,7 @@ elif st.session_state.nav_page == "🗺️ Radar Map":
         max_w = df_global.loc[df_global["wspd"].idxmax()]
         k5.metric("Peak Wind", f"{max_w['wspd']:.0f} km/h", delta=max_w["station_name"])
 
-        c_t1, c_t2, c_t3, c_t4 = st.columns([1.2, 1.1, 1.5, 0.9])
+        c_t1, c_t2, c_t3, c_t4, c_t5 = st.columns([1.1, 1.0, 1.0, 1.4, 0.8])
         with c_t1:
             map_theme = st.selectbox("Map Theme", ["🌑 Dark Matter", "🗺️ Voyager", "☀️ Positron"], label_visibility="collapsed")
             style_urls = {
@@ -896,18 +811,19 @@ elif st.session_state.nav_page == "🗺️ Radar Map":
         with c_t2:
             w_filter = st.selectbox("Filter", ["All States", "Sunny", "Rainy", "Cloudy", "Snowy"], label_visibility="collapsed")
         with c_t3:
+            cam_mode = st.selectbox("Camera", ["🌍 Global View", f"📍 Focus: {act['city']}"], label_visibility="collapsed")
+        with c_t4:
             lc1, lc2, lc3 = st.columns(3)
-            show_3d = lc1.checkbox("3D Bars", value=True)
+            show_3d = lc1.checkbox("3D", value=True)
             show_halo = lc2.checkbox("Halos", value=True)
             show_lbl = lc3.checkbox("Labels", value=True)
-        with c_t4:
-            if st.button("🔄 Refresh", use_container_width=True):
+        with c_t5:
+            if st.button("🔄 Sync", type="secondary", width="stretch"):
                 st.cache_data.clear()
                 st.rerun()
 
         map_df = df_global if w_filter == "All States" else df_global[df_global["predicted_weather"] == w_filter]
 
-        # Add active searched / GPS location pin
         if live.get("success"):
             active_pin = {
                 "key": act["city"], "station_id": "ACTIVE", "station_name": act["city"],
@@ -938,7 +854,11 @@ elif st.session_state.nav_page == "🗺️ Radar Map":
             txt_col = [245, 245, 245, 235] if "Dark" in map_theme else [20, 20, 20, 235]
             layers.append(pdk.Layer("TextLayer", data=map_df, get_position=["lon", "lat"], get_text="map_label", get_size=12, get_color=txt_col, get_alignment_baseline="'top'", get_pixel_offset=[0, 14], pickable=False))
 
-        view_state = pdk.ViewState(latitude=22.0, longitude=15.0, zoom=1.5, pitch=32.0 if show_3d else 10.0)
+        if "Focus" in cam_mode:
+            view_state = pdk.ViewState(latitude=act["lat"], longitude=act["lon"], zoom=4.5, pitch=38.0 if show_3d else 10.0)
+        else:
+            view_state = pdk.ViewState(latitude=22.0, longitude=15.0, zoom=1.5, pitch=32.0 if show_3d else 10.0)
+
         tooltip = {
             "html": """
             <div style="background:rgba(17,24,39,0.95); color:#F9FAFB; padding:10px 14px; border-radius:10px; border:1px solid rgba(245,158,11,0.45); font-family:system-ui; font-size:12px;">
@@ -949,33 +869,34 @@ elif st.session_state.nav_page == "🗺️ Radar Map":
             </div>
             """
         }
-        st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, tooltip=tooltip, map_style=style_urls[map_theme]), use_container_width=True)
+        st.pydeck_chart(pdk.Deck(layers=layers, initial_view_state=view_state, tooltip=tooltip, map_style=style_urls[map_theme]), width="stretch")
 
         cols = ["flag", "station_name", "country", "tmp", "feels_like", "rh", "slp", "wspd", "precip", "wmo_desc", "weather_badge", "confidence"]
-        st.dataframe(map_df[cols], use_container_width=True, hide_index=True)
+        st.dataframe(map_df[cols], width="stretch", hide_index=True)
 
 # =========================================================================
-# PAGE 3: AI TELEMETRY SIMULATOR
+# PAGE 3: AI TELEMETRY SIMULATOR & HUGGING FACE TIMESFM 3.0
 # =========================================================================
 elif st.session_state.nav_page == "🎛️ AI Simulator":
     col_s, col_o = st.columns([1.1, 1], gap="large")
     with col_s:
-        st.subheader(f"Telemetry Controls • {act['city']}")
-        c1, c2 = st.columns(2)
-        with c1:
-            s_temp = st.slider("Temperature (°C)", -35.0, 50.0, float(live.get("tmp", 22.0)), 0.5)
-            s_dpt = st.slider("Dewpoint (°C)", -40.0, 35.0, min(float(live.get("dpt", 14.0)), s_temp), 0.5)
-            a, b = 17.27, 237.7
-            s_rh = int(np.clip(round(100.0 * np.exp((a * s_dpt) / (b + s_dpt) - (a * s_temp) / (b + s_temp))), 10, 100))
-            s_wspd = st.slider("Wind Speed (km/h)", 0.0, 50.0, float(live.get("wspd", 12.0)), 0.5)
-            s_wdir = st.slider("Wind Direction (°)", 0.0, 360.0, float(live.get("wdir", 180.0)), 5.0)
-        with c2:
-            s_slp = st.slider("Pressure (hPa)", 750.0, 1050.0, float(live.get("slp", 1012.0)), 0.5)
-            s_precip = st.slider("Precipitation (%)", 0.0, 100.0, float(live.get("precip", 10.0)), 1.0)
-            s_uv = st.slider("UV Index", 0, 14, int(round(live.get("uv", 4))), 1)
-            s_vis = st.slider("Visibility (km)", 0.0, 20.0, float(min(20.0, live.get("vis", 12.0))), 0.5)
-            cloud_opts = ["clear", "partly cloudy", "cloudy", "overcast"]
-            s_cloud = st.selectbox("Cloud Cover", cloud_opts, index=cloud_opts.index(live.get("cloud", "clear")) if live.get("cloud") in cloud_opts else 0)
+        with st.container(border=True):
+            st.subheader(f"Telemetry Controls • {act['city']}")
+            c1, c2 = st.columns(2)
+            with c1:
+                s_temp = st.slider("Temperature (°C)", -35.0, 50.0, float(live.get("tmp", 22.0)), 0.5)
+                s_dpt = st.slider("Dewpoint (°C)", -40.0, 35.0, min(float(live.get("dpt", 14.0)), s_temp), 0.5)
+                a, b = 17.27, 237.7
+                s_rh = int(np.clip(round(100.0 * np.exp((a * s_dpt) / (b + s_dpt) - (a * s_temp) / (b + s_temp))), 10, 100))
+                s_wspd = st.slider("Wind Speed (km/h)", 0.0, 50.0, float(live.get("wspd", 12.0)), 0.5)
+                s_wdir = st.slider("Wind Direction (°)", 0.0, 360.0, float(live.get("wdir", 180.0)), 5.0)
+            with c2:
+                s_slp = st.slider("Pressure (hPa)", 750.0, 1050.0, float(live.get("slp", 1012.0)), 0.5)
+                s_precip = st.slider("Precipitation (%)", 0.0, 100.0, float(live.get("precip", 10.0)), 1.0)
+                s_uv = st.slider("UV Index", 0, 14, int(round(live.get("uv", 4))), 1)
+                s_vis = st.slider("Visibility (km)", 0.0, 20.0, float(min(20.0, live.get("vis", 12.0))), 0.5)
+                cloud_opts = ["clear", "partly cloudy", "cloudy", "overcast"]
+                s_cloud = st.selectbox("Cloud Cover", cloud_opts, index=cloud_opts.index(live.get("cloud", "clear")) if live.get("cloud") in cloud_opts else 0)
 
     with col_o:
         if artifacts_loaded:
@@ -1000,47 +921,44 @@ elif st.session_state.nav_page == "🎛️ AI Simulator":
 
             v1, v2 = st.columns(2)
             with v1:
-                fig_p, ax_p = plt.subplots(figsize=(3.4, 2.4), facecolor="#151821")
+                fig_p, ax_p = plt.subplots(figsize=(3.4, 2.3), facecolor="#151821")
                 ax_p.set_facecolor("#151821")
                 tr = np.linspace(-35, 50, 100)
-                ax_p.plot(tr, tr, "--", color="#F59E0B", label="Saturation (T=Td)")
+                ax_p.plot(tr, tr, "--", color="#F59E0B")
                 ax_p.scatter([s_temp], [s_dpt], color="#38BDF8", s=80, zorder=5)
                 ax_p.tick_params(colors="#9CA3AF", labelsize=7)
                 ax_p.set_xlabel("Temp (°C)", color="#9CA3AF", fontsize=8)
                 ax_p.set_ylabel("Dewpoint (°C)", color="#9CA3AF", fontsize=8)
                 ax_p.grid(True, linestyle=":", alpha=0.25)
-                st.pyplot(fig_p, use_container_width=True)
+                st.pyplot(fig_p, width="stretch")
                 plt.close(fig_p)
             with v2:
-                fig_w, ax_w = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(3.4, 2.4), facecolor="#151821")
+                fig_w, ax_w = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(3.4, 2.3), facecolor="#151821")
                 ax_w.set_facecolor("#151821")
                 ax_w.annotate("", xy=(np.deg2rad(s_wdir), s_wspd), xytext=(0, 0), arrowprops=dict(arrowstyle="->", color="#F59E0B", lw=2.2))
                 ax_w.set_theta_zero_location("N")
                 ax_w.set_theta_direction(-1)
                 ax_w.set_ylim(0, 50)
                 ax_w.tick_params(colors="#9CA3AF", labelsize=6)
-                st.pyplot(fig_w, use_container_width=True)
+                st.pyplot(fig_w, width="stretch")
                 plt.close(fig_w)
 
             for cname, pr in zip(le.classes_, p_probs):
                 st.progress(float(pr), text=f"{cname}: {pr*100:.1f}%")
 
     # --- HUGGING FACE TIMESFM 3.0 (1.23 GB) DEEP FORECASTER ---
-    st.markdown("---")
-    hf_c1, hf_c2 = st.columns([2.2, 1])
+    st.markdown('<hr style="border:0; border-top:1px solid rgba(255,255,255,0.08); margin:1rem 0;">', unsafe_allow_html=True)
+    hf_c1, hf_c2 = st.columns([2.4, 1])
     with hf_c1:
-        st.subheader("🤗 Hugging Face Foundation Forecaster • `google/timesfm-3.0-pytorch` (1.23 GB)")
+        st.subheader("🤗 Hugging Face Foundation Model • `google/timesfm-3.0-pytorch` (1.23 GB)")
     with hf_c2:
-        run_tf = st.button("⚡ Run 24h TimesFM 3.0 Forecast", use_container_width=True)
-
-    if run_tf:
-        with st.spinner(f"Running Google TimesFM 3.0 (1.23 GB) on past 168h live telemetry for {act['city']}..."):
-            try:
-                from src.hf_weather_forecaster import forecast_weather_with_timesfm
-                tf_res = forecast_weather_with_timesfm(act["lat"], act["lon"], horizon=24)
-                st.session_state.timesfm_res = tf_res
-            except Exception as e:
-                st.error(f"TimesFM 3.0 error: {e}")
+        if st.button("⚡ Run 24h TimesFM 3.0 Forecast", type="primary", width="stretch"):
+            with st.spinner(f"Running Google TimesFM 3.0 (1.23 GB) on past 168h telemetry for {act['city']}..."):
+                try:
+                    from src.hf_weather_forecaster import forecast_weather_with_timesfm
+                    st.session_state.timesfm_res = forecast_weather_with_timesfm(act["lat"], act["lon"], horizon=24)
+                except Exception as e:
+                    st.error(f"TimesFM 3.0 error: {e}")
 
     if "timesfm_res" in st.session_state and st.session_state.timesfm_res:
         tf_res = st.session_state.timesfm_res
@@ -1051,7 +969,7 @@ elif st.session_state.nav_page == "🎛️ AI Simulator":
         mae_nwp = float(np.mean(np.abs(df_tf["TimesFM 3.0 Forecast (°C)"] - df_tf["Open-Meteo NWP (°C)"])))
         k_t3.metric("MAE vs Open-Meteo", f"{mae_nwp:.2f} °C", delta="Zero-Shot")
         st.line_chart(df_tf[["TimesFM 3.0 Forecast (°C)", "Open-Meteo NWP (°C)", "Lower 10% (°C)", "Upper 90% (°C)"]], height=250)
-        st.dataframe(tf_res["forecast_df"], use_container_width=True, hide_index=True)
+        st.dataframe(tf_res["forecast_df"], width="stretch", hide_index=True)
 
 # =========================================================================
 # PAGE 4: RUBRIC VISUALIZATIONS & SOTA BENCHMARK
@@ -1061,23 +979,23 @@ elif st.session_state.nav_page == "📊 Analytics":
     with t1:
         c1, c2 = st.columns(2)
         with c1:
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), caption="1. Target Class Distribution (60,000 Records)", use_container_width=True)
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), caption="3. Psychrometric Phase Space (T vs Td)", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), caption="1. Target Class Distribution (60,000 Records)", width="stretch")
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), caption="3. Psychrometric Phase Space (T vs Td)", width="stretch")
         with c2:
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), caption="2. Pearson Correlation Heatmap", use_container_width=True)
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), caption="4. Barometric Pressure Boxplot", use_container_width=True)
-        st.image(os.path.join(OUTPUTS_DIR, "figures", "5_season_vs_weather.png"), caption="5. Seasonal Contingency Across Climate Zones", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), caption="2. Pearson Correlation Heatmap", width="stretch")
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), caption="4. Barometric Pressure Boxplot", width="stretch")
+        st.image(os.path.join(OUTPUTS_DIR, "figures", "5_season_vs_weather.png"), caption="5. Seasonal Contingency Across Climate Zones", width="stretch")
 
     with t2:
         c1, c2 = st.columns(2)
         with c1:
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), caption="Confusion Matrix (12,000 Unseen Samples)", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), caption="Confusion Matrix (12,000 Unseen Samples)", width="stretch")
         with c2:
-            st.image(os.path.join(OUTPUTS_DIR, "figures", "7_model_comparison_chart.png"), caption="Model Benchmark Comparison", use_container_width=True)
+            st.image(os.path.join(OUTPUTS_DIR, "figures", "7_model_comparison_chart.png"), caption="Model Benchmark Comparison", width="stretch")
         comp_csv = os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")
         lb_csv = os.path.join(OUTPUTS_DIR, "reports", "weather_5k_leaderboard.csv")
-        if os.path.exists(comp_csv): st.dataframe(pd.read_csv(comp_csv), use_container_width=True, hide_index=True)
-        if os.path.exists(lb_csv): st.dataframe(pd.read_csv(lb_csv), use_container_width=True, hide_index=True)
+        if os.path.exists(comp_csv): st.dataframe(pd.read_csv(comp_csv), width="stretch", hide_index=True)
+        if os.path.exists(lb_csv): st.dataframe(pd.read_csv(lb_csv), width="stretch", hide_index=True)
 
 # =========================================================================
 # PAGE 5: PRACTICAL EXAM DEFENSE (STAGES A TO H)
@@ -1091,45 +1009,45 @@ else:
         {"Stage": "E. Cross-Validation", "Marks": "2", "CO": "CO2 L3", "Deliverable": "Stratified 80/20 (48k/12k), 5-Fold CV (99.98% ± 0.01%)"},
         {"Stage": "F. Training & Tuning", "Marks": "4", "CO": "CO2 L4", "Deliverable": "Random Forest GridSearchCV + Paradigm Analysis"},
         {"Stage": "G. Evaluation & SOTA", "Marks": "8", "CO": "CO3 L5", "Deliverable": "100.0% Unseen Accuracy, ROC-AUC 1.000, WEATHER-5K Leaderboard"},
-        {"Stage": "H. Deployment & Ethics", "Marks": "6", "CO": "CO4 L5", "Deliverable": "FastAPI + Streamlit + Live Open-Meteo + PSI Drift + Asymmetric Risk"},
+        {"Stage": "H. Deployment & Ethics", "Marks": "6", "CO": "CO4 L5", "Deliverable": "FastAPI + Streamlit + TimesFM 3.0 + PSI Drift + Asymmetric Risk"},
     ])
-    st.dataframe(rubric_df, use_container_width=True, hide_index=True)
+    st.dataframe(rubric_df, width="stretch", hide_index=True)
 
     tabs = st.tabs(["A: Data", "B: Stats", "C: Visuals", "D: Prep", "E: CV", "F: Tuning", "G: Eval", "H: Deploy"])
     with tabs[0]:
         from src.data_collection import get_attribute_metadata, load_dataset
         df_raw, _ = load_dataset()
-        st.dataframe(get_attribute_metadata(), use_container_width=True, hide_index=True)
+        st.dataframe(get_attribute_metadata(), width="stretch", hide_index=True)
     with tabs[1]:
         from src.descriptive_stats import compute_descriptive_statistics
         if "df_raw" not in locals():
             from src.data_collection import load_dataset
             df_raw, _ = load_dataset()
         stats = compute_descriptive_statistics(df_raw)
-        st.dataframe(stats["summary_table"].round(3), use_container_width=True)
+        st.dataframe(stats["summary_table"].round(3), width="stretch")
     with tabs[2]:
         c1, c2 = st.columns(2)
-        c1.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), use_container_width=True)
-        c2.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), use_container_width=True)
-        c1.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), use_container_width=True)
-        c2.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), use_container_width=True)
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "1_target_distribution.png"), width="stretch")
+        c2.image(os.path.join(OUTPUTS_DIR, "figures", "2_correlation_heatmap.png"), width="stretch")
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "3_temp_vs_humidity.png"), width="stretch")
+        c2.image(os.path.join(OUTPUTS_DIR, "figures", "4_pressure_boxplot.png"), width="stretch")
     with tabs[3]:
         st.markdown("- **Null Audit:** 0 missing values\n- **IQR Winsorization:** Clipped to $[Q_1 - 1.5\\,IQR, Q_3 + 1.5\\,IQR]$\n- **StandardScaler:** $z = (x - \\mu)/\\sigma$ across 25 encoded features")
     with tabs[4]:
         st.dataframe(pd.DataFrame({
             "Fold": ["Fold 1", "Fold 2", "Fold 3", "Fold 4", "Fold 5", "Mean"],
             "Accuracy": ["99.98%", "99.99%", "99.98%", "99.97%", "99.99%", "99.98% ± 0.01%"]
-        }), use_container_width=True, hide_index=True)
+        }), width="stretch", hide_index=True)
     with tabs[5]:
         st.dataframe(pd.DataFrame([
             {"Parameter": "n_estimators", "Value": "100"},
             {"Parameter": "max_depth", "Value": "12"},
             {"Parameter": "min_samples_split", "Value": "5"},
             {"Parameter": "criterion", "Value": "gini"}
-        ]), use_container_width=True, hide_index=True)
+        ]), width="stretch", hide_index=True)
     with tabs[6]:
         c1, c2 = st.columns([1, 1.3])
-        c1.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), use_container_width=True)
-        c2.dataframe(pd.read_csv(os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")), use_container_width=True, hide_index=True)
+        c1.image(os.path.join(OUTPUTS_DIR, "figures", "6_confusion_matrix.png"), width="stretch")
+        c2.dataframe(pd.read_csv(os.path.join(OUTPUTS_DIR, "reports", "model_comparison_summary.csv")), width="stretch", hide_index=True)
     with tabs[7]:
-        st.markdown("- **REST API:** `api.py` (`/predict`, `/predict/live`, `/health`)\n- **Drift Detection:** $\\text{PSI} = \\sum (P_k - Q_k)\\ln(P_k/Q_k)$\n- **Safety:** $10\\times–20\\times$ penalty on severe weather false negatives")
+        st.markdown("- **REST API:** `api.py` (`/predict`, `/predict/live`, `/health`)\n- **HF Foundation Model:** `google/timesfm-3.0-pytorch` (1.23 GB)\n- **Drift Detection:** $\\text{PSI} = \\sum (P_k - Q_k)\\ln(P_k/Q_k)$\n- **Safety:** $10\\times–20\\times$ penalty on severe weather false negatives")
