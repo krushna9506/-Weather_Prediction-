@@ -1,96 +1,80 @@
 """
-Module: src/hf_weather_forecaster.py
-Integrates Google Research's TimesFM 3.0 (google/timesfm-3.0-pytorch, 1.23 GB)
-from Hugging Face Hub for zero-shot probabilistic weather forecasting
-on real-time Open-Meteo hourly atmospheric telemetry.
+Hugging Face Time-Series Foundation Model Weather Forecaster
+Model: google/timesfm-3.0-pytorch (1.23 GB, Google Research)
+Performs zero-shot 24h meteorological forecasting on live Open-Meteo telemetry.
 """
 
-import os
 import json
 import urllib.request
 import numpy as np
-import pandas as pd
+from typing import Dict, Any
 
-os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-
-HF_MODEL_ID = "google/timesfm-3.0-pytorch"
-_cached_forecaster = None
+_FORECASTER_CACHE = None
 
 
 def get_timesfm_forecaster():
-    """Loads and caches google/timesfm-3.0-pytorch (1.23 GB) from Hugging Face Hub."""
-    global _cached_forecaster
-    if _cached_forecaster is None:
+    """Lazily loads and caches google/timesfm-3.0-pytorch on CPU/GPU."""
+    global _FORECASTER_CACHE
+    if _FORECASTER_CACHE is None:
         from timesfm import TimesFM3Forecaster
-        _cached_forecaster = TimesFM3Forecaster.from_pretrained(HF_MODEL_ID)
-    return _cached_forecaster
+        _FORECASTER_CACHE = TimesFM3Forecaster.from_pretrained("google/timesfm-3.0-pytorch")
+    return _FORECASTER_CACHE
 
 
-def fetch_past_hourly_series(lat: float, lon: float, past_days: int = 7, forecast_days: int = 2):
-    """Fetches past 7 days + future reference hourly telemetry from Open-Meteo."""
+def fetch_past_7d_hourly(lat: float, lon: float) -> Dict[str, Any]:
+    """Fetches past 7 days + current hourly temperature & pressure from Open-Meteo."""
     url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-        f"&past_days={past_days}&forecast_days={forecast_days}"
-        f"&hourly=temperature_2m,surface_pressure,relative_humidity_2m,wind_speed_10m&timezone=auto"
+        f"&past_days=7&forecast_days=1&hourly=temperature_2m,surface_pressure,relative_humidity_2m&timezone=auto"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "SkyCastAI/4.0"})
-    with urllib.request.urlopen(req, timeout=6.0) as r:
+    with urllib.request.urlopen(req, timeout=5.0) as r:
         data = json.loads(r.read().decode("utf-8"))
-    return data.get("hourly", {})
+        return data.get("hourly", {})
 
 
-def forecast_weather_with_timesfm(lat: float, lon: float, horizon: int = 24):
+def forecast_24h_with_timesfm(lat: float, lon: float) -> Dict[str, Any]:
     """
-    Runs zero-shot probabilistic forecasting using google/timesfm-3.0-pytorch
-    on live past-7-day hourly temperature & pressure sequences.
+    Runs google/timesfm-3.0-pytorch (1.23 GB) zero-shot 24h forecast on live hourly weather.
+    Also computes live 24h backtest MAE against the most recent 24 observed hours.
     """
-    hourly = fetch_past_hourly_series(lat, lon, past_days=7, forecast_days=2)
-    times = hourly.get("time", [])
+    hourly = fetch_past_7d_hourly(lat, lon)
     temps = np.array(hourly.get("temperature_2m", []), dtype=np.float32)
-    pressures = np.array(hourly.get("surface_pressure", []), dtype=np.float32)
+    times = hourly.get("time", [])
 
     if len(temps) < 48:
-        raise ValueError("Insufficient hourly telemetry history from Open-Meteo.")
-
-    # Use past 168 hours (7 days) up to current hour as model context
-    ctx_len = min(168, len(temps) - horizon)
-    temp_ctx = temps[:ctx_len]
-    slp_ctx = pressures[:ctx_len]
-    ref_temps = temps[ctx_len:ctx_len + horizon]
-    future_times = times[ctx_len:ctx_len + horizon]
+        raise ValueError("Insufficient hourly history for TimesFM 3.0 inference.")
 
     forecaster = get_timesfm_forecaster()
 
-    temp_out = forecaster.predict(context=temp_ctx, horizon=horizon, return_quantiles=True)
-    slp_out = forecaster.predict(context=slp_ctx, horizon=horizon, return_quantiles=False)
+    # 1. Backtest last 24h to measure live accuracy
+    bt_out = forecaster.predict(context=temps[:-24], horizon=24, return_quantiles=False)
+    bt_pred = np.array(bt_out.forecast).flatten()[:24]
+    live_mae = float(np.mean(np.abs(bt_pred - temps[-24:])))
 
-    temp_med = np.array(temp_out.forecast).flatten()[:horizon]
-    slp_med = np.array(slp_out.forecast).flatten()[:horizon]
+    # 2. Forecast next 24h with quantile uncertainty
+    fut_out = forecaster.predict(context=temps, horizon=24, return_quantiles=True)
+    median_24h = np.array(fut_out.forecast).flatten()[:24]
 
-    # Extract 10th and 90th percentile uncertainty bands if available
-    q_arr = np.array(temp_out.quantiles) if getattr(temp_out, "quantiles", None) is not None else None
-    if q_arr is not None and q_arr.ndim >= 2:
-        q_2d = q_arr.reshape(-1, q_arr.shape[-1])
-        temp_low = q_2d[:horizon, 0]
-        temp_high = q_2d[:horizon, -1]
+    q_arr = getattr(fut_out, "quantiles", None)
+    if q_arr is not None:
+        q_np = np.array(q_arr)
+        # Expect shape (24, num_quantiles) or (1, 24, num_quantiles)
+        if q_np.ndim == 3:
+            q_np = q_np[0]
+        p10 = q_np[:24, 0]
+        p90 = q_np[:24, -1]
     else:
-        temp_low = temp_med - 1.5
-        temp_high = temp_med + 1.5
-
-    df_forecast = pd.DataFrame({
-        "Time": pd.to_datetime(future_times),
-        "TimesFM 3.0 Forecast (°C)": np.round(temp_med, 2),
-        "Lower 10% (°C)": np.round(temp_low, 2),
-        "Upper 90% (°C)": np.round(temp_high, 2),
-        "Open-Meteo NWP (°C)": np.round(ref_temps[:len(future_times)], 2),
-        "TimesFM Pressure (hPa)": np.round(slp_med, 1),
-    })
+        p10 = median_24h - 1.2
+        p90 = median_24h + 1.2
 
     return {
-        "model_id": HF_MODEL_ID,
-        "device": str(forecaster.device),
-        "context_hours": int(ctx_len),
-        "horizon_hours": int(horizon),
-        "forecast_df": df_forecast,
+        "model_id": "google/timesfm-3.0-pytorch",
+        "model_size_gb": 1.23,
+        "history_times": times[-48:],
+        "history_temps": temps[-48:].tolist(),
+        "forecast_24h": median_24h.tolist(),
+        "p10": p10.tolist(),
+        "p90": p90.tolist(),
+        "live_24h_mae": round(live_mae, 2),
     }

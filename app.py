@@ -824,6 +824,52 @@ if st.session_state.nav_page == "🏠 Dashboard":
                 </div>
                 """, unsafe_allow_html=True)
 
+        # --- HUGGING FACE TIMESFM 3.0 (1.23 GB) NEURAL FORECAST PANEL ---
+        st.write("")
+        tf_h1, tf_h2 = st.columns([2.2, 1])
+        with tf_h1:
+            st.markdown('<div style="font-size:1.0rem; font-weight:700; color:#F9FAFB;">🧠 TimesFM 3.0 Neural Weather Forecast <span class="ai-pill">Hugging Face • 1.23 GB</span></div>', unsafe_allow_html=True)
+        with tf_h2:
+            run_tf = st.button("⚡ Run TimesFM 3.0 (24h Forecast)", use_container_width=True)
+
+        if "timesfm_cache" not in st.session_state:
+            st.session_state.timesfm_cache = {}
+
+        loc_key = f"{act['lat']:.2f},{act['lon']:.2f}"
+        if run_tf:
+            with st.spinner("Running google/timesfm-3.0-pytorch (1.23 GB) on live 7-day telemetry..."):
+                try:
+                    from src.hf_weather_forecaster import forecast_24h_with_timesfm
+                    st.session_state.timesfm_cache[loc_key] = forecast_24h_with_timesfm(act["lat"], act["lon"])
+                except Exception as e:
+                    st.error(f"TimesFM 3.0 error: {e}")
+
+        if loc_key in st.session_state.timesfm_cache:
+            tf_res = st.session_state.timesfm_cache[loc_key]
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Model", "TimesFM 3.0", delta="1.23 GB (HF)")
+            m2.metric("Live 24h MAE", f"{tf_res['live_24h_mae']} °C", delta="Zero-Shot")
+            m3.metric("Next +6h Temp", f"{tf_res['forecast_24h'][5]:.1f} °C")
+            m4.metric("Next +24h Temp", f"{tf_res['forecast_24h'][23]:.1f} °C")
+
+            fig_tf, ax_tf = plt.subplots(figsize=(9, 2.5), facecolor="#151821")
+            ax_tf.set_facecolor("#151821")
+            hist = tf_res["history_temps"]
+            fc = tf_res["forecast_24h"]
+            x_hist = np.arange(-len(hist) + 1, 1)
+            x_fc = np.arange(1, len(fc) + 1)
+            ax_tf.plot(x_hist, hist, color="#9CA3AF", lw=1.8, label="Observed (Past 48h)")
+            ax_tf.plot(x_fc, fc, color="#F59E0B", lw=2.3, label="TimesFM 3.0 Median (+24h)")
+            ax_tf.fill_between(x_fc, tf_res["p10"], tf_res["p90"], color="#F59E0B", alpha=0.18, label="P10–P90 Band")
+            ax_tf.axvline(0, color="#374151", linestyle="--", lw=1)
+            ax_tf.set_ylabel("Temp (°C)", color="#9CA3AF", fontsize=8)
+            ax_tf.set_xlabel("Hours Relative to Now (0h)", color="#9CA3AF", fontsize=8)
+            ax_tf.tick_params(colors="#9CA3AF", labelsize=7)
+            ax_tf.legend(facecolor="#151821", edgecolor="none", labelcolor="#D1D5DB", fontsize=7.5, loc="upper left")
+            ax_tf.grid(True, linestyle=":", alpha=0.2)
+            st.pyplot(fig_tf, use_container_width=True)
+            plt.close(fig_tf)
+
 # =========================================================================
 # PAGE 2: 3D/2D GLOBAL RADAR MAP
 # =========================================================================
