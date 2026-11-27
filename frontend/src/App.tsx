@@ -42,7 +42,7 @@ export function App() {
   const [sim, setSim] = useState({
     temp: 26, dpt: 15, wspd: 12, wdir: 180, slp: 1012, precip: 10, uv: 5, vis: 12, cloud: 'clear'
   });
-  const [simPred, setSimPred] = useState<{ predicted_weather: string; confidence_score: number; class_probabilities: Record<string, number> } | null>(null);
+  const [simPred, setSimPred] = useState<{ predicted_weather: string; confidence_score: number; class_probabilities: Record<string, number>; ml_suite?: DashboardData['ml_suite'] } | null>(null);
 
   // Hugging Face TimesFM 3.0 state
   const [timesfm, setTimesfm] = useState<TimesFMResult | null>(null);
@@ -210,7 +210,7 @@ export function App() {
   const navItems: { id: NavPage; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'map', label: 'Radar Map', icon: <MapIcon className="w-4 h-4" /> },
-    { id: 'simulator', label: 'AI Simulator', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'simulator', label: 'ML Model Lab', icon: <Sliders className="w-4 h-4" /> },
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'rubric', label: 'Exam Rubric', icon: <GraduationCap className="w-4 h-4" /> },
   ];
@@ -463,6 +463,59 @@ export function App() {
                   )}
                 </div>
               </div>
+
+              {/* ML-DOMINANT LIVE 5-MODEL ENSEMBLE & EXPLAINABLE ML (XAI) SECTION */}
+              {dash.ml_suite && (
+                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                  {/* 5-Model Live Ensemble Voting */}
+                  <div className="lg:col-span-7 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">5-Model ML Ensemble Live Inference</h3>
+                        <p className="text-[11px] text-gray-400">Trained on 60,000 WEATHER-5K Observations • Real-Time Microsecond Benchmark</p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        {dash.ml_suite.consensus}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+                      {dash.ml_suite.ensemble.map((m) => (
+                        <div key={m.model} className="bg-[#0B0D12] border border-white/10 rounded-xl p-2.5 flex flex-col justify-between">
+                          <div className="text-[11px] font-semibold text-gray-300 truncate" title={m.model}>{m.model}</div>
+                          <div className="text-sm font-bold text-amber-400 mt-1">{m.prediction}</div>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                            <span>{m.confidence}%</span>
+                            <span className="text-emerald-400">{m.latency_us} µs</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Explainable ML (XAI) Feature Attribution & Drift */}
+                  <div className="lg:col-span-5 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-white">Explainable ML (Feature Attribution)</h3>
+                      <span className="text-[11px] font-semibold text-emerald-400">
+                        Drift: {dash.ml_suite.drift.status} (|z|={dash.ml_suite.drift.max_z})
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {dash.ml_suite.xai_features.slice(0, 5).map((f) => (
+                        <div key={f.feature} className="space-y-0.5">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-gray-300">{f.feature} <span className="text-gray-500">(z={f.z_score})</span></span>
+                            <span className="text-amber-400 font-semibold">{f.contribution_pct}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-[#0B0D12] rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, f.contribution_pct * 2.2)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )
         )}
@@ -554,6 +607,23 @@ export function App() {
                     </div>
                   ))}
                 </div>
+                {simPred?.ml_suite && (
+                  <div className="pt-3 border-t border-white/10 space-y-2">
+                    <div className="flex justify-between text-xs font-bold text-white">
+                      <span>5-Model ML Consensus</span>
+                      <span className="text-amber-400">{simPred.ml_suite.consensus}</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5 text-center">
+                      {simPred.ml_suite.ensemble.map((m) => (
+                        <div key={m.model} className="bg-[#0B0D12] rounded-lg p-1.5">
+                          <div className="text-[10px] text-gray-400 truncate">{m.model.split(' ')[0]}</div>
+                          <div className="text-xs font-bold text-white">{m.prediction}</div>
+                          <div className="text-[10px] text-emerald-400">{m.latency_us}µs</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

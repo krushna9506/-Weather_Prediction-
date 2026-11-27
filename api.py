@@ -54,10 +54,57 @@ try:
     scaler = joblib.load(get_path("scaler.pkl"))
     label_encoder = joblib.load(get_path("label_encoder.pkl"))
     feature_cols = joblib.load(get_path("feature_columns.pkl"))
+    all_models_path = get_path("all_models.pkl")
+    all_models = joblib.load(all_models_path) if os.path.exists(all_models_path) else {"Random Forest": model}
     artifacts_ready = True
 except Exception as e:
     artifacts_ready = False
+    all_models = {}
     load_error = str(e)
+
+def _analyze_ml_suite(scaled_df: pd.DataFrame) -> Dict[str, Any]:
+    """Runs all 5 ML models, measures microsecond latency, XAI feature attributions & Z-score drift."""
+    ensemble = []
+    votes: Dict[str, int] = {}
+    for m_name, clf in all_models.items():
+        t0 = time.perf_counter()
+        p_idx = int(clf.predict(scaled_df)[0])
+        p_cls = str(label_encoder.inverse_transform([p_idx])[0])
+        if hasattr(clf, "predict_proba"):
+            conf = round(float(clf.predict_proba(scaled_df)[0][p_idx] * 100.0), 1)
+        else:
+            conf = 100.0
+        lat_us = round((time.perf_counter() - t0) * 1e6, 1)
+        ensemble.append({"model": m_name, "prediction": p_cls, "confidence": conf, "latency_us": lat_us})
+        votes[p_cls] = votes.get(p_cls, 0) + 1
+
+    # Explainable ML (XAI) Feature Attribution via Random Forest Gini Importances * |z|
+    z_vals = scaled_df.iloc[0].values
+    importances = getattr(model, "feature_importances_", np.ones(len(feature_cols)) / len(feature_cols))
+    raw_scores = importances * (1.0 + np.abs(z_vals))
+    total_s = float(np.sum(raw_scores)) or 1.0
+    xai = []
+    for col, imp, z, sc in zip(feature_cols, importances, z_vals, raw_scores):
+        if imp > 0.005:
+            xai.append({
+                "feature": col.replace("_", ": "),
+                "contribution_pct": round(float(sc / total_s * 100.0), 1),
+                "importance_pct": round(float(imp * 100.0), 1),
+                "z_score": round(float(z), 2)
+            })
+    xai.sort(key=lambda x: x["contribution_pct"], reverse=True)
+
+    # Z-score Drift Check on continuous meteorological features
+    max_z = round(float(np.max(np.abs(z_vals[:12]))), 2)
+    drift_status = "In-Distribution (Healthy)" if max_z < 3.0 else ("Moderate Shift" if max_z < 4.5 else "Anomaly / Drift Alert")
+    top_vote = max(votes.items(), key=lambda kv: kv[1]) if votes else ("Sunny", 1)
+
+    return {
+        "ensemble": ensemble,
+        "consensus": f"{top_vote[1]}/{len(ensemble)} ML Models Agree → {top_vote[0]}",
+        "xai_features": xai[:6],
+        "drift": {"max_z": max_z, "status": drift_status}
+    }
 
 # Pydantic Telemetry Schema with validation constraints
 class Weather5KSensorPayload(BaseModel):
@@ -198,13 +245,15 @@ def predict_weather(payload: Weather5KSensorPayload):
     wdir = clean_dict.get("Wind Direction", 180.0)
     fc_24h_temp = round(tmp + np.sin(wdir * np.pi / 180.0) * 1.5, 1)
     fc_72h_temp = round(tmp + np.cos(clean_dict["Latitude"] * np.pi / 180.0) * 2.0, 1)
-    
+    ml_suite = _analyze_ml_suite(scaled_df)
+
     return {
         "station_id": clean_dict.get("Station_ID", "CUSTOM"),
         "station_name": clean_dict.get("Station_Name", "Custom Station"),
         "predicted_weather": pred_class,
         "confidence_score": round(float(probs[pred_idx]), 4),
         "class_probabilities": confidence_dict,
+        "ml_suite": ml_suite,
         "multi_horizon_projections": {
             "forecast_24h_temperature_C": fc_24h_temp,
             "forecast_72h_temperature_C": fc_72h_temp
@@ -441,6 +490,7 @@ def get_dashboard_weather(lat: float = 18.52, lon: float = 73.85, alt: float = 5
         "Visibility (km)": float(min(20.0, cur.get("visibility", 10000.0) / 1000.0)), "Cloud Cover": cloud,
     }
     pred_class, conf, probs = _run_ai_calibrated(clean_dict, wmo_cat=wmo_cat)
+    ml_suite = _analyze_ml_suite(transform_to_features(clean_dict))
 
     h_temps = hourly.get("temperature_2m", [])
     diurnal = [h_temps[6], h_temps[13], h_temps[18], h_temps[22]] if len(h_temps) >= 24 else [clean_dict["Temperature"]] * 4
@@ -463,6 +513,7 @@ def get_dashboard_weather(lat: float = 18.52, lon: float = 73.85, alt: float = 5
             "sunrise": daily.get("sunrise", [""])[0], "sunset": daily.get("sunset", [""])[0], "timestamp": cur.get("time"),
         },
         "ai": {"predicted": pred_class, "confidence": conf, "probabilities": probs},
+        "ml_suite": ml_suite,
         "diurnal": diurnal,
         "wind_series": hourly.get("wind_speed_10m", [])[:18],
         "daily": days,

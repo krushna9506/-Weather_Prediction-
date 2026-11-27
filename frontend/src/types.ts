@@ -18,6 +18,27 @@ export interface DayForecast {
   desc: string;
 }
 
+export interface MLModelVote {
+  model: string;
+  prediction: string;
+  confidence: number;
+  latency_us: number;
+}
+
+export interface XAIFeature {
+  feature: string;
+  contribution_pct: number;
+  importance_pct: number;
+  z_score: number;
+}
+
+export interface MLSuite {
+  ensemble: MLModelVote[];
+  consensus: string;
+  xai_features: XAIFeature[];
+  drift: { max_z: number; status: string };
+}
+
 export interface DashboardData {
   location: {
     city: string;
@@ -53,6 +74,7 @@ export interface DashboardData {
     confidence: number;
     probabilities: Record<string, number>;
   };
+  ml_suite?: MLSuite;
   diurnal: number[];
   wind_series: number[];
   daily: DayForecast[];
