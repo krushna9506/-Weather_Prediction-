@@ -13,11 +13,14 @@ _FORECASTER_CACHE = None
 
 
 def get_timesfm_forecaster():
-    """Lazily loads and caches google/timesfm-3.0-pytorch on CPU/GPU."""
+    """Lazily loads and caches google/timesfm-3.0-pytorch locally without requiring an HF token."""
     global _FORECASTER_CACHE
     if _FORECASTER_CACHE is None:
         from timesfm import TimesFM3Forecaster
-        _FORECASTER_CACHE = TimesFM3Forecaster.from_pretrained("google/timesfm-3.0-pytorch")
+        try:
+            _FORECASTER_CACHE = TimesFM3Forecaster.from_pretrained("google/timesfm-3.0-pytorch", local_files_only=True)
+        except Exception:
+            _FORECASTER_CACHE = TimesFM3Forecaster.from_pretrained("google/timesfm-3.0-pytorch")
     return _FORECASTER_CACHE
 
 

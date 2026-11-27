@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Cloud, CloudRain, CloudSnow, Sun, Search, MapPin, Navigation,
   Wind, Droplets, Eye, Thermometer, Sunrise, Sunset, Cpu, BarChart3,
-  GraduationCap, Map as MapIcon, LayoutDashboard, Sliders
+  GraduationCap, Map as MapIcon, LayoutDashboard, Sliders, RefreshCw
 } from 'lucide-react';
 import type {
   ActiveLocation, AnalyticsData, DashboardData, GlobalStation, NavPage, TimesFMResult
@@ -50,6 +50,8 @@ export function App() {
 
   // Analytics state
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [nowClock, setNowClock] = useState<string>(new Date().toLocaleTimeString());
+  const [lastSynced, setLastSynced] = useState<string>('--:--:--');
 
   const loadDashboard = async (loc: ActiveLocation) => {
     setLoadingDash(true);
@@ -62,6 +64,7 @@ export function App() {
       if (res.ok) {
         const data: DashboardData = await res.json();
         setDash(data);
+        setLastSynced(new Date().toLocaleTimeString());
         setSim({
           temp: data.current.temp, dpt: Math.min(data.current.dewpoint, data.current.temp),
           wspd: data.current.wind_speed, wdir: data.current.wind_dir, slp: data.current.pressure,
@@ -165,6 +168,19 @@ export function App() {
     fetch('/api/analytics').then((r) => (r.ok ? r.json() : null)).then((d) => d && setAnalytics(d));
   }, []);
 
+  // Real-time ticking clock (1s) and live auto-sync (60s)
+  useEffect(() => {
+    const tClock = setInterval(() => setNowClock(new Date().toLocaleTimeString()), 1000);
+    return () => clearInterval(tClock);
+  }, []);
+
+  useEffect(() => {
+    const tSync = setInterval(() => {
+      loadDashboard(activeLoc);
+    }, 60000);
+    return () => clearInterval(tSync);
+  }, [activeLoc]);
+
   // Live Simulator inference on slider change
   useEffect(() => {
     if (page !== 'simulator') return;
@@ -210,7 +226,9 @@ export function App() {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-white leading-tight">SkyCast AI</h1>
-              <p className="text-xs text-gray-400">{todayLabel} • {activeLoc.city}, {activeLoc.country}</p>
+              <p className="text-xs text-gray-400">
+                {todayLabel} • {nowClock} • {activeLoc.city}, {activeLoc.country}
+              </p>
             </div>
           </div>
 
@@ -242,6 +260,13 @@ export function App() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#151821] border border-white/10 text-gray-200 hover:border-white/30 text-xs font-semibold cursor-pointer transition"
             >
               <MapPin className="w-3.5 h-3.5" /> Auto IP
+            </button>
+            <button
+              onClick={() => loadDashboard(activeLoc)}
+              title={`Last synced at ${lastSynced} (Auto-syncs every 60s)`}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-semibold cursor-pointer transition"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingDash ? 'animate-spin' : ''}`} /> Live
             </button>
           </div>
         </header>
@@ -339,7 +364,10 @@ export function App() {
                   ))}
                 </div>
 
-                <h3 className="text-base font-bold text-white pt-1">Today&apos;s overview</h3>
+                <div className="flex items-center justify-between pt-1">
+                  <h3 className="text-base font-bold text-white">Today&apos;s overview</h3>
+                  <span className="text-[11px] text-emerald-400 font-medium">● Live Satellite Sync: {lastSynced} • No API Key Required</span>
+                </div>
 
                 {/* Row 1: Wind | UV | Sunrise & Sunset */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -407,6 +435,32 @@ export function App() {
                       <span className="flex items-center gap-1 text-xs text-gray-400"><Thermometer className="w-3.5 h-3.5 text-amber-400" /> Pressure {dash.current.pressure} hPa</span>
                     </div>
                   </div>
+                </div>
+
+                {/* Live TimesFM 3.0 (1.23 GB) Neural Forecast Card on Dashboard */}
+                <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-bold text-white">TimesFM 3.0 (1.23 GB Local Model) • 24h Live Forecast</span>
+                    </div>
+                    <button
+                      onClick={runTimesFM}
+                      disabled={loadingTf}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] cursor-pointer transition"
+                    >
+                      {loadingTf ? 'Forecasting...' : '⚡ Run 24h AI Forecast'}
+                    </button>
+                  </div>
+                  {timesfm && (
+                    <div>
+                      <div className="flex gap-4 text-[11px] text-gray-400 mb-1">
+                        <span className="text-amber-400">━━ TimesFM 3.0 (MAE {timesfm.mae_vs_nwp}°C)</span>
+                        <span className="text-sky-400">┄┄ Open-Meteo NWP</span>
+                      </div>
+                      <TimesFmChartSvg series={timesfm.series} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
