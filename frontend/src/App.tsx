@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   Cloud, CloudRain, CloudSnow, Sun, Search, MapPin, Navigation,
-  Wind, Droplets, Eye, Thermometer, Sunrise, Sunset, Cpu, BarChart3,
+  Wind, Cpu, BarChart3,
   GraduationCap, Map as MapIcon, LayoutDashboard, Sliders, RefreshCw
 } from 'lucide-react';
 import type {
   ActiveLocation, AnalyticsData, DashboardData, GlobalStation, NavPage, TimesFMResult
 } from './types';
-import { TempCurveSvg, TimesFmChartSvg, UvGaugeSvg, WindBarsSvg } from './components/BentoCharts';
+import { TempCurveSvg, TimesFmChartSvg } from './components/BentoCharts';
 import { RadarMapView } from './components/RadarMapView';
 
 const WeatherIcon: React.FC<{ cat: string; className?: string }> = ({ cat, className = 'w-8 h-8' }) => {
@@ -294,228 +294,241 @@ export function App() {
         </nav>
 
         {/* ================================================================ */}
-        {/* PAGE 1: DARK BENTO DASHBOARD */}
+        {/* PAGE 1: ML-FIRST DARK BENTO DASHBOARD */}
         {/* ================================================================ */}
         {page === 'dashboard' && (
           loadingDash && !dash ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 animate-pulse">
-              <div className="lg:col-span-4 h-96 bg-[#151821] rounded-2xl" />
-              <div className="lg:col-span-8 h-96 bg-[#151821] rounded-2xl" />
+              <div className="lg:col-span-4 h-72 bg-[#151821] rounded-2xl" />
+              <div className="lg:col-span-8 h-72 bg-[#151821] rounded-2xl" />
             </div>
           ) : dash && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* LEFT COLUMN */}
-              <div className="lg:col-span-4 space-y-4">
-                <div className="bg-[#151821] border border-white/10 rounded-2xl p-5">
+            <div className="space-y-4">
+              {/* SECTION 1 (IN FOCUS): CORE MACHINE LEARNING MODELS */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* Primary ML Classifier Hero Card */}
+                <div className="lg:col-span-4 bg-[#151821] border border-amber-500/35 rounded-2xl p-5 flex flex-col justify-between space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h2 className="text-xl font-bold text-white">{dash.location.city}</h2>
-                      <p className="text-xs text-gray-400">{dash.location.country} • {activeLoc.source}</p>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">Primary ML Classifier</span>
+                      <h2 className="text-xl font-bold text-white mt-0.5">{dash.location.city}, {dash.location.country}</h2>
+                      <p className="text-xs text-gray-400">Random Forest (60k WEATHER-5K Trained)</p>
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                      ● LIVE
+                      ● LIVE ML
                     </span>
                   </div>
-                  <div className="my-5">
-                    <WeatherIcon cat={dash.current.wmo_cat} className="w-14 h-14" />
-                  </div>
-                  <div className="flex items-end justify-between">
-                    <div className="text-5xl font-bold tracking-tight text-white">{Math.round(dash.current.temp)}° C</div>
+
+                  <div className="flex items-center justify-between py-2">
+                    <div className="flex items-center gap-3">
+                      <WeatherIcon cat={dash.ai.predicted} className="w-12 h-12" />
+                      <div>
+                        <div className="text-3xl font-extrabold text-white tracking-tight">{dash.ai.predicted.toUpperCase()}</div>
+                        <div className="text-xs text-gray-400">Temp: {Math.round(dash.current.temp)}°C • RH: {dash.current.humidity}%</div>
+                      </div>
+                    </div>
                     <div className="text-right">
-                      <div className="text-sm font-medium text-gray-200">{dash.current.wmo_desc}</div>
-                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/40">
-                        AI: {dash.ai.predicted} ({dash.ai.confidence}%)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#151821] border border-white/10 rounded-2xl p-5">
-                  <div className="text-sm font-semibold text-gray-200 mb-2">Temperature</div>
-                  <TempCurveSvg temps={dash.diurnal} />
-                </div>
-
-                <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-indigo-950 border border-sky-400/20 rounded-2xl p-5 text-center space-y-3">
-                  <div className="text-sm font-semibold text-gray-100">Explore global map of wind, weather & live stations.</div>
-                  <button
-                    onClick={() => setPage('map')}
-                    className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs cursor-pointer transition"
-                  >
-                    Open Global Radar Map
-                  </button>
-                </div>
-              </div>
-
-              {/* RIGHT COLUMN */}
-              <div className="lg:col-span-8 space-y-4">
-                {/* 7-Day Forecast Strip */}
-                <div className="grid grid-cols-7 gap-2">
-                  {dash.daily.map((d, idx) => (
-                    <div
-                      key={d.date}
-                      className={`rounded-2xl p-3 text-center flex flex-col items-center justify-between h-32 border ${
-                        idx === 0 ? 'bg-[#1C212E] border-amber-500/50' : 'bg-[#151821] border-white/10'
-                      }`}
-                    >
-                      <span className="text-xs font-semibold text-gray-400">{d.day}</span>
-                      <WeatherIcon cat={d.category} className="w-8 h-8" />
-                      <span className="text-base font-bold text-white">{d.temp_max}°</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <h3 className="text-base font-bold text-white">Today&apos;s overview</h3>
-                  <span className="text-[11px] text-emerald-400 font-medium">● Live Satellite Sync: {lastSynced} • No API Key Required</span>
-                </div>
-
-                {/* Row 1: Wind | UV | Sunrise & Sunset */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-44 flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-xs font-semibold text-gray-300">
-                      <span>Wind Status</span>
-                      <Wind className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <WindBarsSvg series={dash.wind_series} />
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-2xl font-bold text-white">{dash.current.wind_speed} <span className="text-xs text-gray-400 font-normal">km/h</span></span>
-                      <span className="text-xs text-gray-400">Gusts {dash.current.wind_gusts}</span>
+                      <div className="text-2xl font-bold text-emerald-400">{dash.ai.confidence}%</div>
+                      <div className="text-[11px] text-gray-400">Confidence</div>
                     </div>
                   </div>
 
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-44 flex flex-col justify-between">
-                    <div className="text-xs font-semibold text-gray-300">UV Index</div>
-                    <UvGaugeSvg uv={dash.current.uv} />
-                    <div className="text-xs text-gray-400 text-center">
-                      {dash.current.uv >= 6 ? 'High solar radiation' : 'Low / Moderate UV'}
-                    </div>
-                  </div>
-
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-44 flex flex-col justify-between">
-                    <div className="text-xs font-semibold text-gray-300">Sunrise and sunset</div>
-                    <div className="flex items-center gap-3">
-                      <Sunrise className="w-6 h-6 text-amber-400" />
-                      <div>
-                        <div className="text-[11px] text-gray-400">Sunrise</div>
-                        <div className="text-sm font-bold text-white">{formatTime12(dash.current.sunrise)}</div>
+                  {/* Live Class Probability Distribution */}
+                  <div className="space-y-1.5 pt-2 border-t border-white/10">
+                    {Object.entries(dash.ai.probabilities).map(([cls, prob]) => (
+                      <div key={cls} className="space-y-0.5">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-gray-300">{cls}</span>
+                          <span className="text-gray-400 font-medium">{(prob * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-[#0B0D12] rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 rounded-full" style={{ width: `${prob * 100}%` }} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Sunset className="w-6 h-6 text-orange-400" />
-                      <div>
-                        <div className="text-[11px] text-gray-400">Sunset</div>
-                        <div className="text-sm font-bold text-white">{formatTime12(dash.current.sunset)}</div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Row 2: Humidity | Visibility | Feels Like */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-24 flex flex-col justify-between">
-                    <div className="text-xs font-semibold text-gray-300">Humidity</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-white">{dash.current.humidity}%</span>
-                      <span className="flex items-center gap-1 text-xs text-gray-400"><Droplets className="w-3.5 h-3.5 text-sky-400" /> Dew point {Math.round(dash.current.dewpoint)}°</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-24 flex flex-col justify-between">
-                    <div className="text-xs font-semibold text-gray-300">Visibility</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-white">{dash.current.visibility} <span className="text-xs text-gray-400 font-normal">km</span></span>
-                      <span className="flex items-center gap-1 text-xs text-gray-400"><Eye className="w-3.5 h-3.5 text-emerald-400" /> {dash.current.visibility >= 10 ? 'Clear sight' : 'Haze'}</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 h-24 flex flex-col justify-between">
-                    <div className="text-xs font-semibold text-gray-300">Feels like</div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-white">{Math.round(dash.current.feels_like)}°</span>
-                      <span className="flex items-center gap-1 text-xs text-gray-400"><Thermometer className="w-3.5 h-3.5 text-amber-400" /> Pressure {dash.current.pressure} hPa</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live TimesFM 3.0 (1.23 GB) Neural Forecast Card on Dashboard */}
-                <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Cpu className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-white">TimesFM 3.0 (1.23 GB Local Model) • 24h Live Forecast</span>
-                    </div>
-                    <button
-                      onClick={runTimesFM}
-                      disabled={loadingTf}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] cursor-pointer transition"
-                    >
-                      {loadingTf ? 'Forecasting...' : '⚡ Run 24h AI Forecast'}
-                    </button>
-                  </div>
-                  {timesfm && (
-                    <div>
-                      <div className="flex gap-4 text-[11px] text-gray-400 mb-1">
-                        <span className="text-amber-400">━━ TimesFM 3.0 (MAE {timesfm.mae_vs_nwp}°C)</span>
-                        <span className="text-sky-400">┄┄ Open-Meteo NWP</span>
+                {/* Right Top: 5-Model ML Ensemble + Explainable ML (XAI) + TimesFM 3.0 */}
+                <div className="lg:col-span-8 space-y-4">
+                  {dash.ml_suite && (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      {/* 5-Model ML Ensemble Consensus */}
+                      <div className="lg:col-span-7 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h3 className="text-sm font-bold text-white">5-Model ML Ensemble Voting</h3>
+                            <p className="text-[11px] text-gray-400">Real-Time Parallel Inference (µs Latency)</p>
+                          </div>
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            {dash.ml_suite.consensus}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                          {dash.ml_suite.ensemble.map((m) => (
+                            <div key={m.model} className="bg-[#0B0D12] border border-white/10 rounded-xl p-2.5 flex flex-col justify-between">
+                              <div className="text-[11px] font-semibold text-gray-300 truncate" title={m.model}>{m.model}</div>
+                              <div className="text-sm font-bold text-amber-400 mt-1">{m.prediction}</div>
+                              <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>{m.confidence}%</span>
+                                <span className="text-emerald-400">{m.latency_us}µs</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <TimesFmChartSvg series={timesfm.series} />
+
+                      {/* Explainable ML (XAI) Feature Attribution & Drift */}
+                      <div className="lg:col-span-5 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-bold text-white">Explainable ML (XAI)</h3>
+                          <span className="text-[10px] font-semibold text-emerald-400">
+                            {dash.ml_suite.drift.status} (|z|={dash.ml_suite.drift.max_z})
+                          </span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {dash.ml_suite.xai_features.slice(0, 5).map((f) => (
+                            <div key={f.feature} className="space-y-0.5">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-gray-300">{f.feature} <span className="text-gray-500">(z={f.z_score})</span></span>
+                                <span className="text-amber-400 font-semibold">{f.contribution_pct}%</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-[#0B0D12] rounded-full overflow-hidden">
+                                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, f.contribution_pct * 2.2)}%` }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
+
+                  {/* TimesFM 3.0 (1.23 GB Hugging Face Foundation Model) */}
+                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-amber-400" />
+                        <div>
+                          <span className="text-xs font-bold text-white">TimesFM 3.0 Neural Forecaster (1.23 GB Local Model)</span>
+                          <span className="text-[11px] text-gray-400 ml-2">• Zero-Shot 24h Temp &amp; Uncertainty Band</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setPage('simulator')}
+                          className="px-3 py-1.5 rounded-lg bg-[#0B0D12] border border-white/10 text-gray-300 hover:text-white text-[11px] font-semibold cursor-pointer transition"
+                        >
+                          Open ML Lab
+                        </button>
+                        <button
+                          onClick={runTimesFM}
+                          disabled={loadingTf}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-[11px] cursor-pointer transition"
+                        >
+                          {loadingTf ? 'Forecasting...' : '⚡ Run 24h TimesFM 3.0'}
+                        </button>
+                      </div>
+                    </div>
+                    {timesfm && (
+                      <div>
+                        <div className="flex gap-4 text-[11px] text-gray-400 mb-1">
+                          <span className="text-amber-400">━━ TimesFM 3.0 (MAE {timesfm.mae_vs_nwp}°C)</span>
+                          <span className="text-sky-400">┄┄ Open-Meteo NWP</span>
+                        </div>
+                        <TimesFmChartSvg series={timesfm.series} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* ML-DOMINANT LIVE 5-MODEL ENSEMBLE & EXPLAINABLE ML (XAI) SECTION */}
-              {dash.ml_suite && (
-                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-12 gap-4">
-                  {/* 5-Model Live Ensemble Voting */}
-                  <div className="lg:col-span-7 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-bold text-white">5-Model ML Ensemble Live Inference</h3>
-                        <p className="text-[11px] text-gray-400">Trained on 60,000 WEATHER-5K Observations • Real-Time Microsecond Benchmark</p>
+              {/* SECTION 2 (SUPPORTING FEATURES): LIVE TELEMETRY & 7-DAY FEED */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                <h3 className="text-sm font-bold text-gray-200">Supporting Live Telemetry &amp; 7-Day Feed (Open-Meteo • No API Key)</h3>
+                <span className="text-[11px] text-emerald-400 font-medium">● Synced: {lastSynced}</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <div className="lg:col-span-4 space-y-3">
+                  <div className="bg-[#151821] border border-white/10 rounded-2xl p-4">
+                    <div className="text-xs font-semibold text-gray-300 mb-1">Diurnal Temperature Curve</div>
+                    <TempCurveSvg temps={dash.diurnal} />
+                  </div>
+                  <div className="bg-gradient-to-br from-slate-800/80 via-slate-900 to-indigo-950 border border-sky-400/20 rounded-2xl p-4 flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-gray-200">28 Global Stations Live Radar</div>
+                    <button
+                      onClick={() => setPage('map')}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs cursor-pointer transition"
+                    >
+                      Open Map
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-8 space-y-3">
+                  {/* 7-Day Forecast Strip */}
+                  <div className="grid grid-cols-7 gap-2">
+                    {dash.daily.map((d, idx) => (
+                      <div
+                        key={d.date}
+                        className={`rounded-2xl p-2.5 text-center flex flex-col items-center justify-between h-28 border ${
+                          idx === 0 ? 'bg-[#1C212E] border-amber-500/50' : 'bg-[#151821] border-white/10'
+                        }`}
+                      >
+                        <span className="text-xs font-semibold text-gray-400">{d.day}</span>
+                        <WeatherIcon cat={d.category} className="w-7 h-7" />
+                        <span className="text-sm font-bold text-white">{d.temp_max}°</span>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        {dash.ml_suite.consensus}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-                      {dash.ml_suite.ensemble.map((m) => (
-                        <div key={m.model} className="bg-[#0B0D12] border border-white/10 rounded-xl p-2.5 flex flex-col justify-between">
-                          <div className="text-[11px] font-semibold text-gray-300 truncate" title={m.model}>{m.model}</div>
-                          <div className="text-sm font-bold text-amber-400 mt-1">{m.prediction}</div>
-                          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                            <span>{m.confidence}%</span>
-                            <span className="text-emerald-400">{m.latency_us} µs</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
 
-                  {/* Explainable ML (XAI) Feature Attribution & Drift */}
-                  <div className="lg:col-span-5 bg-[#151821] border border-white/10 rounded-2xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-white">Explainable ML (Feature Attribution)</h3>
-                      <span className="text-[11px] font-semibold text-emerald-400">
-                        Drift: {dash.ml_suite.drift.status} (|z|={dash.ml_suite.drift.max_z})
-                      </span>
+                  {/* Compact Telemetry Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="flex justify-between text-xs font-semibold text-gray-300"><span>Wind</span><Wind className="w-4 h-4 text-amber-400" /></div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-white">{dash.current.wind_speed} <span className="text-xs text-gray-400 font-normal">km/h</span></span>
+                        <span className="text-[11px] text-gray-400">Gusts {dash.current.wind_gusts}</span>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      {dash.ml_suite.xai_features.slice(0, 5).map((f) => (
-                        <div key={f.feature} className="space-y-0.5">
-                          <div className="flex justify-between text-[11px]">
-                            <span className="text-gray-300">{f.feature} <span className="text-gray-500">(z={f.z_score})</span></span>
-                            <span className="text-amber-400 font-semibold">{f.contribution_pct}%</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-[#0B0D12] rounded-full overflow-hidden">
-                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, f.contribution_pct * 2.2)}%` }} />
-                          </div>
-                        </div>
-                      ))}
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="text-xs font-semibold text-gray-300">UV &amp; Solar</div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-amber-400">{dash.current.uv} <span className="text-xs text-gray-400 font-normal">UV</span></span>
+                        <span className="text-[11px] text-gray-400">{formatTime12(dash.current.sunrise)} / {formatTime12(dash.current.sunset)}</span>
+                      </div>
+                    </div>
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="text-xs font-semibold text-gray-300">Humidity &amp; Dew</div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-sky-400">{dash.current.humidity}%</span>
+                        <span className="text-[11px] text-gray-400">Dew {Math.round(dash.current.dewpoint)}°</span>
+                      </div>
+                    </div>
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="text-xs font-semibold text-gray-300">Visibility</div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-white">{dash.current.visibility} km</span>
+                        <span className="text-[11px] text-gray-400">{dash.current.visibility >= 10 ? 'Clear' : 'Haze'}</span>
+                      </div>
+                    </div>
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="text-xs font-semibold text-gray-300">Feels Like</div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-white">{Math.round(dash.current.feels_like)}°C</span>
+                        <span className="text-[11px] text-gray-400">{dash.current.wmo_desc}</span>
+                      </div>
+                    </div>
+                    <div className="bg-[#151821] border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between h-24">
+                      <div className="text-xs font-semibold text-gray-300">Pressure</div>
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-xl font-bold text-emerald-400">{dash.current.pressure}</span>
+                        <span className="text-[11px] text-gray-400">hPa</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           )
         )}
