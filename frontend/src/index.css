@@ -13,6 +13,10 @@ body {
   border-radius: 16px;
 }
 
+.dark-radar-tiles .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(92%) contrast(90%) saturate(85%);
+}
+
 .leaflet-popup-content-wrapper {
   background: #151821 !important;
   color: #f9fafb !important;

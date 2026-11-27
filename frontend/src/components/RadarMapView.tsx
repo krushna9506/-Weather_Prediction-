@@ -19,10 +19,19 @@ const COLOR_BY_WEATHER: Record<string, string> = {
   Snowy: '#A855F7',
 };
 
-const TILES: Record<string, string> = {
-  'Dark Radar': 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  'Voyager Terrain': 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  'Light Atlas': 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+const TILES: Record<string, { url: string; attr: string }> = {
+  'Dark Radar': {
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attr: '&copy; OpenStreetMap contributors',
+  },
+  'Satellite Earth': {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attr: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+  },
+  'Street & Terrain': {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attr: 'Tiles &copy; Esri',
+  },
 };
 
 export const RadarMapView: React.FC<Props> = ({
@@ -44,7 +53,7 @@ export const RadarMapView: React.FC<Props> = ({
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
     const map = L.map(mapRef.current, { center: [22, 15], zoom: 2, minZoom: 2, worldCopyJump: true });
-    tileLayer.current = L.tileLayer(TILES[theme], { attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
+    tileLayer.current = L.tileLayer(TILES[theme].url, { attribution: TILES[theme].attr }).addTo(map);
     markerLayer.current = L.layerGroup().addTo(map);
     leafletMap.current = map;
     return () => {
@@ -55,7 +64,7 @@ export const RadarMapView: React.FC<Props> = ({
 
   useEffect(() => {
     if (tileLayer.current) {
-      tileLayer.current.setUrl(TILES[theme]);
+      tileLayer.current.setUrl(TILES[theme].url);
     }
   }, [theme]);
 
@@ -216,7 +225,12 @@ export const RadarMapView: React.FC<Props> = ({
       </div>
 
       {/* Interactive Leaflet Map */}
-      <div ref={mapRef} className="w-full h-[460px] border border-white/10 rounded-2xl overflow-hidden shadow-2xl" />
+      <div
+        ref={mapRef}
+        className={`w-full h-[460px] border border-white/10 rounded-2xl overflow-hidden shadow-2xl ${
+          theme === 'Dark Radar' ? 'dark-radar-tiles' : ''
+        }`}
+      />
 
       {/* Station Telemetry Table */}
       <div className="bg-[#151821] border border-white/10 rounded-2xl overflow-hidden">
