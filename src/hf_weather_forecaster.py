@@ -81,3 +81,64 @@ def forecast_24h_with_timesfm(lat: float, lon: float) -> Dict[str, Any]:
         "p90": p90.tolist(),
         "live_24h_mae": round(live_mae, 2),
     }
+
+
+def forecast_weather_with_timesfm(lat: float, lon: float, horizon: int = 24) -> Dict[str, Any]:
+    """
+    Runs google/timesfm-3.0-pytorch (1.23 GB) on past 168h Open-Meteo telemetry
+    and compares against the next 24h Open-Meteo NWP forecast.
+    """
+    import pandas as pd
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+        f"&past_days=7&forecast_days=2&hourly=temperature_2m,surface_pressure&timezone=auto"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "SkyCastAI/4.0"})
+    with urllib.request.urlopen(req, timeout=5.0) as r:
+        hourly = json.loads(r.read().decode("utf-8")).get("hourly", {})
+
+    times = hourly.get("time", [])
+    temps = np.array(hourly.get("temperature_2m", []), dtype=np.float32)
+    press = np.array(hourly.get("surface_pressure", []), dtype=np.float32)
+
+    ctx_len = 168
+    if len(temps) < ctx_len + horizon:
+        ctx_len = max(48, len(temps) - horizon)
+
+    ctx_temps = temps[:ctx_len]
+    ctx_press = press[:ctx_len]
+    fut_times = times[ctx_len:ctx_len + horizon]
+    nwp_temps = temps[ctx_len:ctx_len + horizon]
+
+    forecaster = get_timesfm_forecaster()
+    t_out = forecaster.predict(context=ctx_temps, horizon=horizon, return_quantiles=True)
+    p_out = forecaster.predict(context=ctx_press, horizon=horizon, return_quantiles=False)
+
+    tf_med = np.array(t_out.forecast).flatten()[:horizon]
+    tf_press = np.array(p_out.forecast).flatten()[:horizon]
+
+    q_arr = getattr(t_out, "quantiles", None)
+    if q_arr is not None:
+        q_np = np.array(q_arr)
+        if q_np.ndim == 3:
+            q_np = q_np[0]
+        p10, p90 = q_np[:horizon, 0], q_np[:horizon, -1]
+    else:
+        p10, p90 = tf_med - 1.2, tf_med + 1.2
+
+    df = pd.DataFrame({
+        "Time": fut_times,
+        "TimesFM 3.0 Forecast (°C)": np.round(tf_med, 2),
+        "Lower 10% (°C)": np.round(p10, 2),
+        "Upper 90% (°C)": np.round(p90, 2),
+        "Open-Meteo NWP (°C)": np.round(nwp_temps, 2),
+        "TimesFM Pressure (hPa)": np.round(tf_press, 1),
+    })
+
+    return {
+        "model_id": "google/timesfm-3.0-pytorch",
+        "device": str(getattr(forecaster, "device", "cpu")),
+        "context_hours": int(ctx_len),
+        "forecast_df": df,
+    }
