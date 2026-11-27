@@ -483,11 +483,11 @@ def get_dashboard_weather(lat: float = 18.52, lon: float = 73.85, alt: float = 5
     reg, loc_t, seas = _infer_geo(lat, alt)
     clean_dict = {
         "Latitude": lat, "Longitude": lon, "Altitude (m)": alt, "Region": reg, "Location": loc_t, "Season": seas,
-        "Temperature": float(cur.get("temperature_2m", 20.0)), "Dewpoint": float(cur.get("dew_point_2m", 15.0)),
-        "Humidity": int(cur.get("relative_humidity_2m", 60)), "Wind Speed": float(cur.get("wind_speed_10m", 10.0)),
-        "Wind Direction": float(cur.get("wind_direction_10m", 180.0)), "Precipitation (%)": precip_pct,
-        "Atmospheric Pressure": float(cur.get("surface_pressure", 1013.25)), "UV Index": int(round(float(cur.get("uv_index", 3.0)))),
-        "Visibility (km)": float(min(20.0, cur.get("visibility", 10000.0) / 1000.0)), "Cloud Cover": cloud,
+        "Temperature": float(cur.get("temperature_2m") or 20.0), "Dewpoint": float(cur.get("dew_point_2m") or 15.0),
+        "Humidity": int(cur.get("relative_humidity_2m") or 60), "Wind Speed": float(cur.get("wind_speed_10m") or 10.0),
+        "Wind Direction": float(cur.get("wind_direction_10m") or 180.0), "Precipitation (%)": precip_pct,
+        "Atmospheric Pressure": float(cur.get("surface_pressure") or 1013.25), "UV Index": int(round(float(cur.get("uv_index") or 0.0))),
+        "Visibility (km)": float(min(20.0, (cur.get("visibility") or 10000.0) / 1000.0)), "Cloud Cover": cloud,
     }
     pred_class, conf, probs = _run_ai_calibrated(clean_dict, wmo_cat=wmo_cat)
     ml_suite = _analyze_ml_suite(transform_to_features(clean_dict))
