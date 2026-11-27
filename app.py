@@ -979,6 +979,34 @@ elif st.session_state.nav_page == "🎛️ AI Simulator":
             for cname, pr in zip(le.classes_, p_probs):
                 st.progress(float(pr), text=f"{cname}: {pr*100:.1f}%")
 
+    # --- HUGGING FACE TIMESFM 3.0 (1.23 GB) DEEP FORECASTER ---
+    st.markdown("---")
+    hf_c1, hf_c2 = st.columns([2.2, 1])
+    with hf_c1:
+        st.subheader("🤗 Hugging Face Foundation Forecaster • `google/timesfm-3.0-pytorch` (1.23 GB)")
+    with hf_c2:
+        run_tf = st.button("⚡ Run 24h TimesFM 3.0 Forecast", use_container_width=True)
+
+    if run_tf:
+        with st.spinner(f"Running Google TimesFM 3.0 (1.23 GB) on past 168h live telemetry for {act['city']}..."):
+            try:
+                from src.hf_weather_forecaster import forecast_weather_with_timesfm
+                tf_res = forecast_weather_with_timesfm(act["lat"], act["lon"], horizon=24)
+                st.session_state.timesfm_res = tf_res
+            except Exception as e:
+                st.error(f"TimesFM 3.0 error: {e}")
+
+    if "timesfm_res" in st.session_state and st.session_state.timesfm_res:
+        tf_res = st.session_state.timesfm_res
+        df_tf = tf_res["forecast_df"].set_index("Time")
+        k_t1, k_t2, k_t3 = st.columns(3)
+        k_t1.metric("HF Model", "TimesFM 3.0 (1.23 GB)", delta=f"Device: {tf_res['device'].upper()}")
+        k_t2.metric("24h Avg Temp", f"{df_tf['TimesFM 3.0 Forecast (°C)'].mean():.1f} °C", delta=f"Context: {tf_res['context_hours']}h")
+        mae_nwp = float(np.mean(np.abs(df_tf["TimesFM 3.0 Forecast (°C)"] - df_tf["Open-Meteo NWP (°C)"])))
+        k_t3.metric("MAE vs Open-Meteo", f"{mae_nwp:.2f} °C", delta="Zero-Shot")
+        st.line_chart(df_tf[["TimesFM 3.0 Forecast (°C)", "Open-Meteo NWP (°C)", "Lower 10% (°C)", "Upper 90% (°C)"]], height=250)
+        st.dataframe(tf_res["forecast_df"], use_container_width=True, hide_index=True)
+
 # =========================================================================
 # PAGE 4: RUBRIC VISUALIZATIONS & SOTA BENCHMARK
 # =========================================================================
